@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 186 20% 97%;
+    --foreground: 186 40% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 186 40% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 186 40% 12%;
+    --primary: 186 39% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 186 30% 92%;
+    --secondary-foreground: 186 39% 25%;
+    --muted: 186 20% 93%;
+    --muted-foreground: 186 15% 45%;
+    --accent: 186 30% 90%;
+    --accent-foreground: 186 39% 25%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 186 20% 88%;
+    --input: 186 20% 88%;
+    --ring: 186 39% 39%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Print styles */
+@media print {
+  @page {
+    margin: 10mm;
+    size: A4 landscape;
+  }
+  
+  /* Hide header, navigation, buttons */
+  header,
+  nav,
+  .print\:hidden,
+  button {
+    display: none !important;
+  }
+  
+  /* Show only report content */
+  body {
+    background: white !important;
+    font-size: 8pt !important;
+  }
+  
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  h1, h2, h3 {
+    font-size: 10pt !important;
+    margin: 2mm 0 !important;
+  }
+  
+  table {
+    width: 100% !important;
+    font-size: 7pt !important;
+    border-collapse: collapse !important;
+  }
+  
+  table th {
+    font-size: 7pt !important;
+    padding: 1mm 2mm !important;
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  table td {
+    font-size: 7pt !important;
+    padding: 1mm 2mm !important;
+  }
+  
+  .bg-muted,
+  .bg-primary\/10 {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+  }
+  
+  thead {
+    display: table-header-group;
+  }
+}
