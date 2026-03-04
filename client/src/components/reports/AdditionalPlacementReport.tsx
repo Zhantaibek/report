@@ -39,9 +39,11 @@ function fmtDate(d: string | Date | null | undefined): string {
 export function AdditionalPlacementReport({
   data,
   reportDate,
+  title,
 }: {
   data: AdditionalPlacementData;
   reportDate: string;
+  title?: string;
 }) {
   const dateStr = reportDate || data.trade_date || '';
   const emissionVolume = data.issue_qty > 0 ? data.issue_qty * data.face_value : null;
@@ -53,7 +55,7 @@ export function AdditionalPlacementReport({
     <div className="w-full bg-white pb-6 text-sm print:max-w-none print:px-0">
       <ReportHeader
         formNumber=""
-        title="Информация по допразмещению ГЦБ"
+        title={title || 'Информация по допразмещению ГЦБ'}
         periodFrom={dateStr}
         periodTo={dateStr}
       />

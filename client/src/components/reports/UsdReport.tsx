@@ -31,10 +31,12 @@ export function UsdReport({
   rows,
   dateFrom,
   dateTo,
+  instrument,
 }: {
   rows: UsdReportRow[];
   dateFrom?: string;
   dateTo?: string;
+  instrument?: string;
 }) {
   const totalDeals = rows.reduce((s, r) => s + Number(r.deal_count), 0);
   const totalSec = rows.reduce((s, r) => s + Number(r.sec_count), 0);
@@ -64,6 +66,13 @@ export function UsdReport({
             </tr>
           </thead>
           <tbody>
+            {instrument != null && instrument !== '' && (
+              <tr className="bg-muted/60">
+                <td colSpan={7} className="border border-border px-3 py-2 font-medium">
+                  Инструмент: {instrument}
+                </td>
+              </tr>
+            )}
             {rows.map((row, i) => (
               <tr key={i} className="hover:bg-muted/20">
                 <td className="border border-border px-3 py-1.5 text-center tabular-nums">

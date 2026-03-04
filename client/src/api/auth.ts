@@ -3,7 +3,7 @@ import { api } from './client.ts';
 export interface AuthUser {
   id: number;
   login: string;
-  role: 'admin' | 'broker' | 'exchange';
+  role: 'admin' | 'employee';
   displayName: string | null;
 }
 

@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button.tsx';
 import { SelectWithSearch, type SelectOptionGroup } from '../components/ui/select.tsx';
 import { Play, Printer, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText } from 'lucide-react';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, exportReport, getSecurities, getClasses, getFirms, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow } from '../api/reports.ts';
+import { runReport, runUsdReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -26,6 +26,8 @@ import { AuctionSummary2Report, type AuctionSummary2Row } from '../components/re
 import { BidClassificationReport, type BidClassificationData } from '../components/reports/BidClassificationReport.tsx';
 import { CentralDepositoryReport, type CentralDepositoryData } from '../components/reports/CentralDepositoryReport.tsx';
 import { AdditionalPlacementReport, type AdditionalPlacementData } from '../components/reports/AdditionalPlacementReport.tsx';
+import { ExchangeContractReport, type ExchangeContractData } from '../components/reports/ExchangeContractReport.tsx';
+import { ExchangeCertificateReport, type ExchangeCertificateData } from '../components/reports/ExchangeCertificateReport.tsx';
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 
@@ -41,6 +43,9 @@ export default function Reports() {
   });
   const [result, setResult] = useState<ReportResult | null>(null);
   const [usdRows, setUsdRows] = useState<UsdReportRow[] | null>(null);
+  const [oracleInstruments, setOracleInstruments] = useState<OracleInstrument[]>([]);
+  const [loadingInstruments, setLoadingInstruments] = useState(false);
+  const [selectedOwnId, setSelectedOwnId] = useState<number | undefined>(undefined);
   const [runError, setRunError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -66,7 +71,7 @@ export default function Reports() {
     setUsdRows(null);
     try {
       if (selectedForm?.code === 'Blank_Form_USD') {
-        const res = await runUsdReport(filters.dateFrom, filters.dateTo);
+        const res = await runUsdReport(filters.dateFrom, filters.dateTo, selectedOwnId);
         setUsdRows(res.rows);
         setResult(null);
       } else {
@@ -211,6 +216,12 @@ export default function Reports() {
       if (total === 0) return null;
       return { totalRecords: total, totalPages: total };
     }
+    // Биржевой контракт / Биржевое свидетельство: один документ на сделку на страницу
+    if (result.type === 'table' && (selectedForm.code === 'Exchange_Contract' || selectedForm.code === 'Exchange_Certificate')) {
+      const total = result.rows.length;
+      if (total === 0) return null;
+      return { totalRecords: total, totalPages: total };
+    }
     if (result.type === 'table' && result.rows.length > 0)
       return { totalRecords: result.total, totalPages: Math.ceil(result.total / limit) };
     return null;
@@ -234,9 +245,20 @@ export default function Reports() {
                 <SelectWithSearch
                   value={selectedFormId || undefined}
                   onValueChange={(v) => {
-                    setSelectedFormId(v ?? '');
+                    const newId = v ?? '';
+                    setSelectedFormId(newId);
                     setResult(null);
                     setPage(1);
+                    setUsdRows(null);
+                    setSelectedOwnId(undefined);
+                    const form = forms.find((f) => String(f.id) === newId);
+                    if (form?.code === 'Blank_Form_USD' && oracleInstruments.length === 0) {
+                      setLoadingInstruments(true);
+                      getOracleInstruments()
+                        .then(setOracleInstruments)
+                        .catch(() => {})
+                        .finally(() => setLoadingInstruments(false));
+                    }
                   }}
                   placeholder="— выбрать —"
                   searchFields={['label']}
@@ -253,75 +275,98 @@ export default function Reports() {
                 />
               </div>
 
-              {/* Класс */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
-                  Класс
-                </label>
-                <SelectWithSearch
-                  value={filters.classCode ?? '0'}
-                  onValueChange={(v) => {
-                    const classCode = v === '0' ? undefined : v;
-                    setFilters({ ...filters, classCode, instrument: undefined });
-                  }}
-                  disabled={!selectedFormId}
-                  placeholder="— все классы —"
-                  searchFields={['label', 'value']}
-                  options={[
-                    { value: '0', label: '— все классы —' },
-                    ...classes.map((c) => ({
-                      value: c.code,
-                      label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
-                    })),
-                  ]}
-                />
-              </div>
-
-              {/* Инструмент */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
-                  Инструмент
-                </label>
-                <SelectWithSearch
-                  value={filters.instrument ?? '0'}
-                  onValueChange={(v) => setFilters({ ...filters, instrument: v === '0' ? undefined : v })}
-                  disabled={!selectedFormId}
-                  placeholder="— все инструменты —"
-                  searchFields={['label', 'value']}
-                  options={[
-                    { value: '0', label: '— все инструменты —' },
-                    ...securities
-                      .filter((s) => !filters.classCode || s.classCode.toLowerCase() === filters.classCode!.toLowerCase())
-                      .map((s) => ({
-                        value: s.secCode,
-                        label: s.secFullName && s.secFullName !== s.secCode
-                          ? `${s.secCode} — ${s.secFullName}`
-                          : s.secCode,
+              {/* Инструмент Oracle — только для USD отчёта */}
+              {selectedForm?.code === 'Blank_Form_USD' ? (
+                <div className="space-y-1.5 col-span-3">
+                  <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
+                    Инструмент
+                  </label>
+                  <SelectWithSearch
+                    value={selectedOwnId !== undefined ? String(selectedOwnId) : '0'}
+                    onValueChange={(v) => setSelectedOwnId(v && v !== '0' ? Number(v) : undefined)}
+                    placeholder={loadingInstruments ? 'Загрузка…' : '— все инструменты —'}
+                    loading={loadingInstruments}
+                    searchFields={['label', 'value']}
+                    options={[
+                      { value: '0', label: '— все инструменты —' },
+                      ...oracleInstruments.map((i) => ({
+                        value: String(i.id),
+                        label: i.extcode ? `${i.extcode} — ${i.namerus}` : i.namerus,
                       })),
-                  ]}
-                />
-              </div>
+                    ]}
+                  />
+                </div>
+              ) : null}
 
-              {/* Участник */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
-                  Участник
-                </label>
-                <SelectWithSearch
-                  value={filters.firmCode ?? '0'}
-                  onValueChange={(v) => setFilters({ ...filters, firmCode: v && v !== '0' ? v : undefined })}
-                  disabled={!selectedFormId}
-                  placeholder="— все участники —"
-                  searchFields={['label', 'value']}
-                  options={[
-                    { value: '0', label: '— все участники —' },
-                    ...firms.map((f) => ({
-                      value: f.firmId,
-                      label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
-                    })),
-                  ]}
-                />
-              </div>
+              {/* Класс / Инструмент / Участник — скрываем для USD отчёта */}
+              {selectedForm?.code !== 'Blank_Form_USD' && <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
+                    Класс
+                  </label>
+                  <SelectWithSearch
+                    value={filters.classCode ?? '0'}
+                    onValueChange={(v) => {
+                      const classCode = v === '0' ? undefined : v;
+                      setFilters({ ...filters, classCode, instrument: undefined });
+                    }}
+                    disabled={!selectedFormId}
+                    placeholder="— все классы —"
+                    searchFields={['label', 'value']}
+                    options={[
+                      { value: '0', label: '— все классы —' },
+                      ...classes.map((c) => ({
+                        value: c.code,
+                        label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
+                      })),
+                    ]}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
+                    Инструмент
+                  </label>
+                  <SelectWithSearch
+                    value={filters.instrument ?? '0'}
+                    onValueChange={(v) => setFilters({ ...filters, instrument: v === '0' ? undefined : v })}
+                    disabled={!selectedFormId}
+                    placeholder="— все инструменты —"
+                    searchFields={['label', 'value']}
+                    options={[
+                      { value: '0', label: '— все инструменты —' },
+                      ...securities
+                        .filter((s) => !filters.classCode || s.classCode.toLowerCase() === filters.classCode!.toLowerCase())
+                        .map((s) => ({
+                          value: s.secCode,
+                          label: s.secFullName && s.secFullName !== s.secCode
+                            ? `${s.secCode} — ${s.secFullName}`
+                            : s.secCode,
+                        })),
+                    ]}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
+                    Участник
+                  </label>
+                  <SelectWithSearch
+                    value={filters.firmCode ?? '0'}
+                    onValueChange={(v) => setFilters({ ...filters, firmCode: v && v !== '0' ? v : undefined })}
+                    disabled={!selectedFormId}
+                    placeholder="— все участники —"
+                    searchFields={['label', 'value']}
+                    options={[
+                      { value: '0', label: '— все участники —' },
+                      ...firms.map((f) => ({
+                        value: f.firmId,
+                        label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
+                      })),
+                    ]}
+                  />
+                </div>
+              </>}
             </div>
 
             {/* Row 2: Даты | Кнопки */}
@@ -392,7 +437,7 @@ export default function Reports() {
                     </>
                   )}
                 </Button>
-                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows && usdRows.length > 0 && selectedForm?.code === 'Blank_Form_USD') || (result && (selectedForm?.code === 'Blank_Form_2' || selectedForm?.code === 'Blank_Form_3' || selectedForm?.code === 'Blank_Form_6A' || selectedForm?.code === 'Blank_Form_9' || selectedForm?.code === 'Auction_Summary' || selectedForm?.code === 'Auction_Summary_2' || selectedForm?.code === 'Auction_Bid_Classification' || selectedForm?.code === 'Auction_Central_Depository' || selectedForm?.code === 'Auction_Additional_Placement'))) && (
+                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows && usdRows.length > 0 && selectedForm?.code === 'Blank_Form_USD') || (result && (selectedForm?.code === 'Blank_Form_2' || selectedForm?.code === 'Blank_Form_3' || selectedForm?.code === 'Blank_Form_6A' || selectedForm?.code === 'Blank_Form_9' || selectedForm?.code === 'Auction_Summary' || selectedForm?.code === 'Auction_Summary_2' || selectedForm?.code === 'Auction_Bid_Classification' || selectedForm?.code === 'Auction_Central_Depository' || selectedForm?.code === 'Auction_Additional_Placement' || selectedForm?.code === 'Exchange_Contract' || selectedForm?.code === 'Exchange_Certificate'))) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
                     Печать
@@ -816,6 +861,75 @@ export default function Reports() {
                 );
               })()}
               
+              {/* Если Exchange_Contract — биржевой контракт, один документ на страницу */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Exchange_Contract' || result.rows.length === 0) return null;
+                const perPage = 1;
+                const start = (page - 1) * perPage;
+                const end = isPrinting ? result.rows.length : start + perPage;
+                const paged = (result.rows as Record<string, unknown>[]).slice(start, end);
+                return (
+                  <>
+                    {paged.map((row, idx) => {
+                      const data: ExchangeContractData = {
+                        id: row.id ?? '',
+                        tradeDate: String(row.tradeDate ?? ''),
+                        classCode: String(row.classCode ?? ''),
+                        secCode: String(row.secCode ?? ''),
+                        sellerName: row.sellerName != null ? String(row.sellerName) : null,
+                        sellAccount: row.sellAccount != null ? String(row.sellAccount) : null,
+                        buyerName: row.buyerName != null ? String(row.buyerName) : null,
+                        buyAccount: row.buyAccount != null ? String(row.buyAccount) : null,
+                        quantity: Number(row.quantity ?? 0),
+                        price: Number(row.price ?? 0),
+                        value: Number(row.value ?? 0),
+                        settleDate: row.settleDate != null ? String(row.settleDate) : null,
+                        couponRate: row.couponRate != null ? Number(row.couponRate) : null,
+                      };
+                      return (
+                        <div key={`exchange-contract-${row.id ?? idx}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
+                          <ExchangeContractReport data={data} />
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+
+              {/* Если Exchange_Certificate — биржевое свидетельство */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Exchange_Certificate' || result.rows.length === 0) return null;
+                const perPage = 1;
+                const start = (page - 1) * perPage;
+                const end = isPrinting ? result.rows.length : start + perPage;
+                const paged = (result.rows as Record<string, unknown>[]).slice(start, end);
+                return (
+                  <>
+                    {paged.map((row, idx) => {
+                      const data: ExchangeCertificateData = {
+                        id: row.id ?? '',
+                        tradeDate: String(row.tradeDate ?? ''),
+                        classCode: String(row.classCode ?? ''),
+                        secCode: String(row.secCode ?? ''),
+                        sellerName: row.sellerName != null ? String(row.sellerName) : null,
+                        sellAccount: row.sellAccount != null ? String(row.sellAccount) : null,
+                        buyerName: row.buyerName != null ? String(row.buyerName) : null,
+                        buyAccount: row.buyAccount != null ? String(row.buyAccount) : null,
+                        quantity: Number(row.quantity ?? 0),
+                        price: Number(row.price ?? 0),
+                        value: Number(row.value ?? 0),
+                        settleDate: row.settleDate != null ? String(row.settleDate) : null,
+                      };
+                      return (
+                        <div key={`exchange-cert-${row.id ?? idx}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
+                          <ExchangeCertificateReport data={data} />
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+
               {/* Если Auction_Additional_Placement — информация по допразмещению */}
               {(() => {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Auction_Additional_Placement') return null;
@@ -861,7 +975,7 @@ export default function Reports() {
                       };
                       return (
                         <div key={`add-placement-${key}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
-                          <AdditionalPlacementReport data={data} reportDate={filters.dateFrom || ''} />
+                          <AdditionalPlacementReport data={data} reportDate={filters.dateFrom || ''} title={selectedForm?.description || selectedForm?.name} />
                         </div>
                       );
                     })}
@@ -876,12 +990,16 @@ export default function Reports() {
                     rows={usdRows}
                     dateFrom={filters.dateFrom}
                     dateTo={filters.dateTo}
+                    instrument={selectedOwnId !== undefined ? (() => {
+                      const inv = oracleInstruments.find((i) => i.id === selectedOwnId);
+                      return inv ? (inv.extcode ? `${inv.extcode} — ${inv.namerus}` : inv.namerus) : undefined;
+                    })() : undefined}
                   />
                 </div>
               )}
 
               {/* Остальные формы — обычные таблицы */}
-              {result?.type === 'table' && !['Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3', 'Blank_Form_6A', 'Blank_Form_9', 'Blank_Form_USD', 'Auction_Summary', 'Auction_Summary_2', 'Auction_Bid_Classification', 'Auction_Central_Depository', 'Auction_Additional_Placement'].includes(selectedForm.code) && (() => {
+              {result?.type === 'table' && !['Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3', 'Blank_Form_6A', 'Blank_Form_9', 'Blank_Form_USD', 'Auction_Summary', 'Auction_Summary_2', 'Auction_Bid_Classification', 'Auction_Central_Depository', 'Auction_Additional_Placement', 'Exchange_Contract', 'Exchange_Certificate'].includes(selectedForm.code) && (() => {
                 const start = (page - 1) * limit;
                 const end = start + limit;
                 const pagedRows = result.rows.slice(start, end);

@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card.tsx';
+import { Button } from '../../components/ui/button.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table.tsx';
+import { Modal } from '../../components/ui/modal.tsx';
 import { api } from '../../api/client.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { Plus, Pencil, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
+
+const LOGIN_REGEX = /^[a-z0-9_]{3,}$/;
+function isLoginValid(value: string): boolean {
+  return value.length >= 3 && LOGIN_REGEX.test(value);
+}
+
+function generatePasswordFromLogin(loginValue: string): string {
+  const base = (loginValue.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user').slice(0, 20);
+  return base + '123';
+}
 
 interface UserRow {
   id: number;
@@ -14,17 +28,33 @@ const PAGE_SIZE = 20;
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Администратор',
-  broker: 'Брокер',
-  exchange: 'Биржа',
+  employee: 'Сотрудник',
 };
 
+const ROLES: Array<'admin' | 'employee'> = ['admin', 'employee'];
+
 export default function Users() {
+  const { user: currentUser } = useAuth();
   const [list, setList] = useState<UserRow[]>([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [role, setRole] = useState<'admin' | 'employee'>('employee');
+  const [submitError, setSubmitError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const loadUsers = () => {
+    api.get<UserRow[]>('/users').then(setList).catch(() => {});
+  };
 
   useEffect(() => {
-    api.get<UserRow[]>('/users').then(setList).catch(() => {});
+    loadUsers();
   }, []);
 
   const filtered = useMemo(() => {
@@ -42,25 +72,204 @@ export default function Users() {
   const currentPage = Math.min(page, totalPages);
   const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const handleSearch = (v: string) => {
-    setSearch(v);
-    setPage(1);
+  const openCreate = () => {
+    setEditingId(null);
+    setLogin('');
+    setPassword('');
+    setDisplayName('');
+    setRole('employee');
+    setSubmitError('');
+    setLoginError('');
+    setFormOpen(true);
+  };
+
+  const openEdit = (u: UserRow) => {
+    setEditingId(u.id);
+    setLogin(u.login);
+    setPassword('');
+    setDisplayName(u.display_name ?? '');
+    setRole((u.role as 'admin' | 'employee') || 'employee');
+    setSubmitError('');
+    setLoginError('');
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    setSubmitError('');
+    setLoginError('');
+  };
+
+  const handleLoginChange = (value: string) => {
+    setLogin(value);
+    if (value && !isLoginValid(value)) {
+      setLoginError('Только латинские буквы (a–z), цифры и символ _; минимум 3 символа');
+    } else {
+      setLoginError('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError('');
+    if (!isLoginValid(login)) {
+      setLoginError('Только латинские буквы (a–z), цифры и символ _; минимум 3 символа');
+      return;
+    }
+    setLoginError('');
+    setLoading(true);
+    try {
+      if (editingId !== null) {
+        const body: { login: string; role: string; displayName: string; password?: string } = {
+          login,
+          role,
+          displayName: displayName || '',
+        };
+        if (password.trim()) body.password = password;
+        await api.put(`/users/${editingId}`, body);
+      } else {
+        if (!password.trim()) {
+          setSubmitError('Укажите пароль');
+          setLoading(false);
+          return;
+        }
+        await api.post('/users', { login, password, role, displayName: displayName || null });
+      }
+      loadUsers();
+      closeForm();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Ошибка');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number, loginName: string) => {
+    if (!window.confirm(`Удалить пользователя «${loginName}»?`)) return;
+    setLoading(true);
+    try {
+      await api.delete(`/users/${id}`);
+      loadUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ошибка удаления');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div>
+    <div className="space-y-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
           <CardTitle>Сотрудники</CardTitle>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Поиск по логину, имени, роли..."
-            className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3d848c]/30 focus:border-[#3d848c] transition"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Поиск по логину, имени, роли..."
+              className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3d848c]/30 focus:border-[#3d848c] transition"
+            />
+            <Button onClick={openCreate} size="sm">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Добавить
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          <Modal
+            open={formOpen}
+            onClose={closeForm}
+            closeOnBackdropClick={false}
+            title={editingId !== null ? 'Редактирование пользователя' : 'Новый пользователь'}
+          >
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {submitError && (
+                <p className="text-sm text-destructive">{submitError}</p>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">Логин</label>
+                <input
+                  type="text"
+                  value={login}
+                  onChange={(e) => handleLoginChange(e.target.value)}
+                  required
+                  className={`w-full h-9 rounded-md border bg-background px-3 text-sm ${loginError ? 'border-destructive' : 'border-input'}`}
+                  autoComplete="username"
+                />
+                {loginError && <p className="text-xs text-destructive mt-1">{loginError}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Пароль {editingId !== null && '(оставьте пустым, чтобы не менять)'}
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required={editingId === null}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-20 text-sm"
+                    autoComplete={editingId === null ? 'new-password' : 'off'}
+                  />
+                  <div className="absolute right-1 flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setPassword(generatePasswordFromLogin(login))}
+                      className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                      title="Сгенерировать пароль"
+                    >
+                      <KeyRound size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="p-1.5 rounded text-muted-foreground hover:text-foreground transition"
+                      tabIndex={-1}
+                      title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Имя</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Отображаемое имя"
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Роль</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'admin' | 'employee')}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" disabled={loading}>
+                  {editingId !== null ? 'Сохранить' : 'Создать'}
+                </Button>
+                <Button type="button" variant="outline" onClick={closeForm} disabled={loading}>
+                  Отмена
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
           {list.length === 0 ? (
             <p className="text-sm text-muted-foreground">Нет сотрудников</p>
           ) : (
@@ -72,12 +281,13 @@ export default function Users() {
                     <TableHead>Логин</TableHead>
                     <TableHead>Имя</TableHead>
                     <TableHead>Роль</TableHead>
+                    <TableHead className="w-24 text-right">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pageItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                         Ничего не найдено
                       </TableCell>
                     </TableRow>
@@ -88,6 +298,32 @@ export default function Users() {
                         <TableCell className="font-medium">{u.login}</TableCell>
                         <TableCell>{u.display_name ?? '—'}</TableCell>
                         <TableCell>{ROLE_LABELS[u.role] ?? u.role}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => openEdit(u)}
+                              disabled={loading}
+                              title="Изменить"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(u.id, u.login)}
+                              disabled={loading || currentUser?.id === u.id}
+                              title={currentUser?.id === u.id ? 'Нельзя удалить себя' : 'Удалить'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}

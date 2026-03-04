@@ -64,6 +64,10 @@ router.delete('/:id', async (req, res) => {
     res.status(400).json({ error: 'Invalid id' });
     return;
   }
+  if (req.user && req.user.id === id) {
+    res.status(403).json({ error: 'Нельзя удалить самого себя' });
+    return;
+  }
   await deleteUser(id);
   res.json({ ok: true });
 });

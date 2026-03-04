@@ -74,8 +74,18 @@ export interface UsdReportRow {
   volume_som: number;
 }
 
-export function runUsdReport(dateFrom: string, dateTo: string): Promise<{ rows: UsdReportRow[] }> {
-  return api.post('/reports/usd', { dateFrom, dateTo });
+export interface OracleInstrument {
+  id: number;
+  namerus: string;
+  extcode: string;
+}
+
+export function getOracleInstruments(): Promise<OracleInstrument[]> {
+  return api.get('/reports/usd/instruments');
+}
+
+export function runUsdReport(dateFrom: string, dateTo: string, ownId?: number): Promise<{ rows: UsdReportRow[] }> {
+  return api.post('/reports/usd', { dateFrom, dateTo, ownId });
 }
 
 export async function exportReport(params: {

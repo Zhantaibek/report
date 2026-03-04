@@ -5,7 +5,6 @@ import currencyRatesRoutes from './currency-rates.routes.js';
 import reportFormsRoutes from './report-forms.routes.js';
 import reportsRoutes from './reports.routes.js';
 import dataSourcesRoutes from './data-sources.routes.js';
-import brokersRoutes from './brokers.routes.js';
 import usersRoutes from './users.routes.js';
 
 const api = Router();
@@ -16,7 +15,6 @@ api.use('/currency-rates', currencyRatesRoutes);
 api.use('/report-forms', reportFormsRoutes);
 api.use('/reports', reportsRoutes);
 api.use('/data-sources', dataSourcesRoutes);
-api.use('/brokers', brokersRoutes);
 api.use('/users', usersRoutes);
 // Админский роут для форм отчетов удален - формы теперь в коде (report-definitions.ts)
 

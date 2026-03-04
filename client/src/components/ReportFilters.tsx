@@ -8,17 +8,15 @@ import {
   SelectValue,
 } from './ui/select.tsx';
 import type { RunFilters } from '../api/reports.ts';
-import type { Broker } from '../api/brokers.ts';
 
 interface Props {
   filters: RunFilters;
   onChange: (f: RunFilters) => void;
-  brokers: Broker[];
   disabled?: boolean;
   singleDate?: boolean;
 }
 
-export default function ReportFilters({ filters, onChange, brokers, disabled, singleDate }: Props) {
+export default function ReportFilters({ filters, onChange, disabled, singleDate }: Props) {
   return (
     <>
       {singleDate ? (

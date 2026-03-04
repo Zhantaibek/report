@@ -1,5 +1,5 @@
 import pg from 'pg';
-import type { ConnectionConfig } from '../db/repositories/dataSources.js';
+import type { ConnectionConfig } from '../config/data-sources.js';
 
 export async function queryPostgres(
   config: ConnectionConfig,

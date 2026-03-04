@@ -53,8 +53,8 @@ export default function Login() {
       {/* Main card */}
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex min-h-[520px]">
 
-        {/* Left — Form */}
-        <div className="flex-1 flex flex-col justify-center px-10 py-12">
+        {/* Left — Form (50%) */}
+        <div className="w-1/2 min-w-0 flex-shrink-0 flex flex-col justify-center px-10 py-12">
           {/* Logo */}
           <div className="flex items-center gap-2 mb-10">
             <img src="/favicon.png" alt="logo" className="w-8 h-8 object-contain" />
@@ -137,30 +137,17 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Right — Animated Chart */}
-        <div className="hidden md:flex flex-1 items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #0f3b40 0%, #1a5c63 50%, #2d6b72 100%)' }}>
+        {/* Right — Animated Chart (50%) */}
+        <div className="hidden md:flex w-1/2 min-w-0 flex-shrink-0 items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #0f3b40 0%, #1a5c63 50%, #2d6b72 100%)' }}>
 
           <style>{`
             @keyframes growBar {
               from { transform: scaleY(0); }
               to   { transform: scaleY(1); }
             }
-            @keyframes drawLine {
-              from { stroke-dashoffset: 1100; }
-              to   { stroke-dashoffset: 0; }
-            }
-            @keyframes fadeInDot {
-              0%   { opacity: 0; transform: scale(0); }
-              60%  { transform: scale(1.4); }
-              100% { opacity: 1; transform: scale(1); }
-            }
             @keyframes fadeUp {
               from { opacity: 0; transform: translateY(10px); }
               to   { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes pulse {
-              0%, 100% { opacity: 0.8; r: 10; }
-              50%       { opacity: 0.1; r: 18; }
             }
             .bar { transform-origin: bottom; animation: growBar 0.65s cubic-bezier(.22,.97,.58,1) both; }
             .bar1 { animation-delay: 0.1s; }
@@ -170,20 +157,7 @@ export default function Login() {
             .bar5 { animation-delay: 0.5s; }
             .bar6 { animation-delay: 0.6s; }
             .bar7 { animation-delay: 0.7s; }
-            .trend-line {
-              stroke-dasharray: 1100;
-              stroke-dashoffset: 1100;
-              animation: drawLine 1.6s cubic-bezier(.4,0,.2,1) 0.9s forwards;
-            }
-            .trend-area {
-              stroke-dasharray: 1100;
-              stroke-dashoffset: 1100;
-              animation: drawLine 1.6s cubic-bezier(.4,0,.2,1) 0.9s forwards;
-            }
-            .trend-dot { opacity: 0; animation: fadeInDot 0.35s ease 2.3s forwards; }
-            .arrow-head { opacity: 0; animation: fadeUp 0.35s ease 2.5s forwards; }
             .chart-label { opacity: 0; animation: fadeUp 0.6s ease 0.2s forwards; }
-            .pulse-ring { animation: pulse 2s ease-in-out 2.8s infinite; }
           `}</style>
 
           {/* Subtle background grid */}
@@ -209,18 +183,6 @@ export default function Login() {
                   <stop offset="0%" stopColor="#57b6c0" stopOpacity="0.85" />
                   <stop offset="100%" stopColor="#3d848c" stopOpacity="0.45" />
                 </linearGradient>
-                <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#7ecdd4" />
-                  <stop offset="100%" stopColor="#ffffff" />
-                </linearGradient>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#57b6c0" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#57b6c0" stopOpacity="0" />
-                </linearGradient>
-                <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="5" result="blur" />
-                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
               </defs>
 
               {/* Grid */}
@@ -228,7 +190,7 @@ export default function Login() {
                 <line key={y} x1="28" y1={y} x2="330" y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth="1" strokeDasharray="4 4" />
               ))}
 
-              {/* Bars */}
+              {/* Bars: плавный рост снизу вверх */}
               {[
                 { x: 34,  h: 44,  d: 'bar1' },
                 { x: 80,  h: 78,  d: 'bar2' },
@@ -249,52 +211,6 @@ export default function Login() {
                 <text key={lbl} x={50 + i * 46} y="248" fill="rgba(255,255,255,0.28)" fontSize="8" textAnchor="middle">{lbl}</text>
               ))}
 
-              {/*
-                Smooth cubic bezier through bar midpoints:
-                x midpoints: 50 96 142 188 234 280 326
-                y values (slightly varied for natural wave): 208 178 150 115 82 48 22
-                control points offset ±20 horizontally for smooth S-curve
-              */}
-
-              {/* Area under curve */}
-              <path
-                className="trend-area"
-                d="M50,208 C66,208 80,165 96,178 C112,191 126,142 142,150 C158,158 172,108 188,115 C204,122 218,72 234,82 C250,92 264,42 280,48 C296,54 310,16 326,22 L326,232 L50,232 Z"
-                fill="url(#areaGrad)"
-              />
-
-              {/* Glow behind line */}
-              <path
-                className="trend-line"
-                d="M50,208 C66,208 80,165 96,178 C112,191 126,142 142,150 C158,158 172,108 188,115 C204,122 218,72 234,82 C250,92 264,42 280,48 C296,54 310,16 326,22"
-                stroke="#57b6c0"
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                opacity="0.18"
-                filter="url(#glow)"
-              />
-
-              {/* Main curve */}
-              <path
-                className="trend-line"
-                d="M50,208 C66,208 80,165 96,178 C112,191 126,142 142,150 C158,158 172,108 188,115 C204,122 218,72 234,82 C250,92 264,42 280,48 C296,54 310,16 326,22"
-                stroke="url(#lineGrad)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-
-              {/* Dots */}
-              {[[50,208],[96,178],[142,150],[188,115],[234,82],[280,48]].map(([cx,cy],i) => (
-                <circle key={i} className="trend-dot" cx={cx} cy={cy} r="4" fill="#a8e6eb" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-              ))}
-
-              {/* Top pulsing dot */}
-              <circle className="pulse-ring" cx="326" cy="22" r="10" stroke="#a8e6eb" strokeWidth="1.5" fill="none" />
-              <circle className="trend-dot" cx="326" cy="22" r="5" fill="white" filter="url(#glow)" />
             </svg>
           </div>
         </div>

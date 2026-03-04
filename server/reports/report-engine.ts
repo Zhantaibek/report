@@ -1,5 +1,5 @@
 import type { Trade, ReportResult } from '../types/index.js';
-import { getDataSources } from '../db/repositories/dataSources.js';
+import { getDataSources } from '../config/data-sources.js';
 import { getTrades, runCustomSqlQuery } from '../data-sources/index.js';
 import { applyFilters, normalizeTradesForReport } from './filters.js';
 import { runTable } from './runners/table-runner.js';
@@ -36,12 +36,12 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     customSql: null,
   };
 
-  const sources = await getDataSources(true);
+  const sources = getDataSources(true);
   const sourceIds = dataSourceIds.length > 0 ? dataSourceIds : sources.map((ds) => ds.id);
 
   const sqlQuery = getSqlForReport(definition.code);
   if (sqlQuery && sourceIds.length === 0) {
-    throw new Error('Нет активных источников данных. Добавьте и включите источник в разделе «Источники данных».');
+    throw new Error('Нет активных источников данных. Настройте переменные POSTGRES_QUIK_HOST, POSTGRES_QUIK_DATABASE, POSTGRES_QUIK_USER, POSTGRES_QUIK_PASSWORD в .env');
   }
 
   let allTrades: Trade[] = [];
@@ -62,7 +62,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Дедупликация по ID сделки (на случай, если разные источники вернули одинаковые сделки)
   // Для аукционов не дедуплицируем — строки агрегированы (по цене или сравнение текущий/предыдущий)
   let uniqueTrades: Trade[];
-  if (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement') {
+  if (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate') {
     uniqueTrades = allTrades;
   } else {
     const uniqueTradesMap = new Map<string, Trade>();
@@ -78,7 +78,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Если использовался custom SQL с параметрами, фильтрация уже применена в запросе
   // Для аукционов в строках нет brokerId — применяем только фильтр по инструменту
   const filtered = sqlQuery
-    ? applyFilters(uniqueTrades, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement')
+    ? applyFilters(uniqueTrades, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate')
         ? { instrument: filters.instrument, classCode: filters.classCode }
         : { brokerId: filters.brokerId, firmCode: filters.firmCode, instrument: filters.instrument, classCode: filters.classCode })
     : applyFilters(uniqueTrades, filters);

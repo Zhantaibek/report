@@ -1,5 +1,5 @@
 import sql from 'mssql';
-import type { ConnectionConfig } from '../db/repositories/dataSources.js';
+import type { ConnectionConfig } from '../config/data-sources.js';
 
 export async function queryMssql(
   config: ConnectionConfig,

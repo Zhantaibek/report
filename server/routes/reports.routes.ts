@@ -3,9 +3,9 @@ import { authMiddleware, applyBrokerFilter } from '../auth/middleware.js';
 import { runReport } from '../reports/report-engine.js';
 import { reportToXlsxBuffer } from '../reports/export/xlsx.js';
 import { reportToCsv } from '../reports/export/csv.js';
-import { getDataSources } from '../db/repositories/dataSources.js';
+import { getDataSources } from '../config/data-sources.js';
 import { getSecurities, getClasses, getFirms } from '../data-sources/index.js';
-import { queryOracleUsd } from '../data-sources/oracle.js';
+import { queryOracleUsd, queryOracleInstruments } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
 
 const router = Router();
@@ -14,7 +14,7 @@ router.use(authMiddleware);
 
 router.get('/securities', async (_req, res) => {
   try {
-    const sources = await getDataSources(true);
+    const sources = getDataSources(true);
     const results = await Promise.all(sources.map((ds) => getSecurities(ds.id)));
     const merged = new Map<string, { secCode: string; classCode: string; secFullName: string }>();
     for (const list of results) {
@@ -33,7 +33,7 @@ router.get('/securities', async (_req, res) => {
 
 router.get('/classes', async (_req, res) => {
   try {
-    const sources = await getDataSources(true);
+    const sources = getDataSources(true);
     const results = await Promise.all(sources.map((ds) => getClasses(ds.id)));
     const merged = new Map<string, { code: string; name: string }>();
     for (const list of results) {
@@ -52,7 +52,7 @@ router.get('/classes', async (_req, res) => {
 
 router.get('/firms', async (_req, res) => {
   try {
-    const sources = await getDataSources(true);
+    const sources = getDataSources(true);
     const results = await Promise.all(sources.map((ds) => getFirms(ds.id)));
     const merged = new Map<string, { firmId: string; firmName: string }>();
     for (const list of results) {
@@ -91,18 +91,29 @@ router.post('/run', async (req, res) => {
   }
 });
 
+/** Список инструментов из Oracle CURRINSTRUMENT */
+router.get('/usd/instruments', async (_req, res) => {
+  try {
+    const instruments = await queryOracleInstruments();
+    res.json(instruments);
+  } catch (err) {
+    console.error('[/api/reports/usd/instruments]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
+  }
+});
+
 /**
  * USD-отчёт: данные из Oracle (ARCTS.DEAL) + курс USD из PostgreSQL.
  */
 router.post('/usd', async (req, res) => {
   try {
-    const { dateFrom, dateTo } = req.body ?? {};
+    const { dateFrom, dateTo, ownId } = req.body ?? {};
     if (!dateFrom || !dateTo) {
       res.status(400).json({ error: 'dateFrom and dateTo required' });
       return;
     }
 
-    const oracleRows = await queryOracleUsd(dateFrom, dateTo);
+    const oracleRows = await queryOracleUsd(dateFrom, dateTo, ownId ? Number(ownId) : undefined);
 
     // Добавляем курс USD из нашей PostgreSQL таблицы currency_rates
     const rows = await Promise.all(

@@ -1,11 +1,10 @@
 import type { Trade } from '../types/index.js';
-import { getDataSourceById } from '../db/repositories/dataSources.js';
-import { getFieldMappingByDataSourceId } from '../db/repositories/fieldMappings.js';
+import { getDataSourceById, getFieldMappingByDataSourceId } from '../config/data-sources.js';
 import { buildSelectQuery } from './build-select.js';
 import { queryPostgres } from './postgres.js';
 import { queryMssql } from './mssql.js';
 import { queryMysql } from './mysql.js';
-import type { DataSourceType } from '../db/repositories/dataSources.js';
+import type { DataSourceType } from '../config/data-sources.js';
 
 export interface TradeFilters {
   dateFrom?: string;
@@ -40,7 +39,7 @@ export async function runCustomSqlQuery(
   customSql: string,
   filters?: TradeFilters
 ): Promise<Record<string, unknown>[]> {
-  const ds = await getDataSourceById(dataSourceId);
+  const ds = getDataSourceById(dataSourceId);
   if (!ds || !ds.is_active) return [];
 
   const config = JSON.parse(ds.connection_config) as {
@@ -90,10 +89,10 @@ export async function getTrades(
   dataSourceId: number,
   _filters?: TradeFilters
 ): Promise<Trade[]> {
-  const ds = await getDataSourceById(dataSourceId);
+  const ds = getDataSourceById(dataSourceId);
   if (!ds || !ds.is_active) return [];
 
-  const mapping = await getFieldMappingByDataSourceId(dataSourceId);
+  const mapping = getFieldMappingByDataSourceId(dataSourceId);
   if (!mapping) return [];
 
   const columnMappings = JSON.parse(mapping.column_mappings) as Record<string, string>;

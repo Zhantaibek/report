@@ -77,7 +77,7 @@ export interface ChartReportResult {
 
 export type ReportResult = TableReportResult | SummaryReportResult | ChartReportResult;
 
-export type UserRole = 'admin' | 'broker' | 'exchange';
+export type UserRole = 'admin' | 'employee';
 
 export interface AuthUser {
   id: number;

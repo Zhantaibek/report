@@ -395,6 +395,35 @@ ORDER BY b."SecCode", b."TradeDate", b.actual_value DESC
 `.trim();
 
 /**
+ * SQL для Биржевого контракта (один документ на сделку)
+ */
+const exchangeContractQuery = `
+WITH unique_trades AS (
+  SELECT t.*
+  FROM "Trades" t
+  WHERE t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+  ORDER BY t."TradeNum", t."TradeDate" DESC
+)
+SELECT
+  t."TradeNum" AS "id",
+  MAX(t."TradeDate") AS "tradeDate",
+  MAX(t."ClassCode") AS "classCode",
+  MAX(t."SecCode") AS "secCode",
+  MAX(CASE WHEN t."Operation" = 'Продажа' THEN NULLIF(TRIM(t."FirmName"), '') END) AS "sellerName",
+  MAX(CASE WHEN t."Operation" = 'Продажа' THEN t."Account" END) AS "sellAccount",
+  MAX(CASE WHEN t."Operation" = 'Купля' THEN NULLIF(TRIM(t."FirmName"), '') END) AS "buyerName",
+  MAX(CASE WHEN t."Operation" = 'Купля' THEN t."Account" END) AS "buyAccount",
+  MAX(t."Qty") AS "quantity",
+  MAX(t."Price") AS "price",
+  MAX(t."Value") AS "value",
+  MAX(t."SettleDate") AS "settleDate",
+  NULL::numeric AS "couponRate"
+FROM unique_trades t
+GROUP BY t."TradeNum"
+ORDER BY t."TradeNum"
+`.trim();
+
+/**
  * Все формы отчетов определены здесь
  */
 export const reportDefinitions: ReportDefinition[] = [
@@ -490,6 +519,24 @@ export const reportDefinitions: ReportDefinition[] = [
     category: 'Отчеты по Аукциону',
     singleDate: true,
     sql: additionalPlacementQuery,
+  },
+  {
+    code: 'Exchange_Contract',
+    name: 'Exchange_Contract',
+    description: 'Биржевой контракт',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+    sql: exchangeContractQuery,
+  },
+  {
+    code: 'Exchange_Certificate',
+    name: 'Exchange_Certificate',
+    description: 'Биржевое свидетельство',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+    sql: exchangeContractQuery,
   },
 ];
 

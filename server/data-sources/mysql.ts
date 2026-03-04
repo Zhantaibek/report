@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import type { ConnectionConfig } from '../db/repositories/dataSources.js';
+import type { ConnectionConfig } from '../config/data-sources.js';
 
 export async function queryMysql(
   config: ConnectionConfig,

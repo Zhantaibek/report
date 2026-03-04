@@ -15,10 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Главная' },
     { to: '/reports', label: 'Отчёты' },
     ...(user?.role === 'admin'
-      ? [
-          { to: '/admin/brokers', label: 'Участники' },
-          { to: '/admin/users', label: 'Сотрудники' },
-        ]
+      ? [{ to: '/admin/users', label: 'Сотрудники' }]
       : []),
   ];
 
@@ -65,7 +62,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {user?.displayName || user?.login}
                 </span>
                 <span className="text-white/55 text-[10px]">
-                  {user?.role === 'admin' ? 'Администратор' : user?.role === 'broker' ? 'Брокер' : 'Биржа'}
+                  {user?.role}
                 </span>
               </div>
             </div>

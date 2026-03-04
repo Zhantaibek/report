@@ -7,28 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   login TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('admin', 'broker', 'exchange')),
+  role TEXT NOT NULL CHECK(role IN ('admin', 'employee')),
   display_name TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- Data sources (external DB connections)
-CREATE TABLE IF NOT EXISTS data_sources (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('postgres', 'mssql', 'mysql')),
-  connection_config TEXT NOT NULL,
-  is_active SMALLINT NOT NULL DEFAULT 1,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- Field mapping: external columns -> canonical trade fields
-CREATE TABLE IF NOT EXISTS field_mappings (
-  id SERIAL PRIMARY KEY,
-  data_source_id INTEGER NOT NULL REFERENCES data_sources(id) ON DELETE CASCADE,
-  table_name TEXT NOT NULL,
-  column_mappings TEXT NOT NULL,
-  UNIQUE(data_source_id)
 );
 
 -- Report forms (minimal metadata, SQL in code)
@@ -82,7 +63,13 @@ END $$;
 -- Уникальный индекс (currency_code, rate_date) — для существующих установок
 CREATE UNIQUE INDEX IF NOT EXISTS currency_rates_code_date_idx ON currency_rates(currency_code, rate_date);
 
-CREATE INDEX IF NOT EXISTS idx_field_mappings_ds ON field_mappings(data_source_id);
+-- Миграция: удаляем таблицы data_sources, field_mappings, brokers (перенесены в код / .env)
+DO $$ BEGIN
+  DROP TABLE IF EXISTS field_mappings;
+  DROP TABLE IF EXISTS data_sources;
+  DROP TABLE IF EXISTS brokers;
+EXCEPTION WHEN others THEN NULL;
+END $$;
 
 -- Миграция: удаляем broker_id из users если существует
 DO $$ BEGIN
@@ -92,5 +79,23 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE users DROP COLUMN IF EXISTS broker_id;
   END IF;
+END $$;
+
+-- Миграция: только роли admin и employee
+DO $$
+DECLARE
+  cname text;
+BEGIN
+  UPDATE users SET role = 'employee' WHERE role IN ('broker', 'exchange');
+  FOR cname IN
+    SELECT con.conname FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    WHERE rel.relname = 'users' AND con.contype = 'c'
+  LOOP
+    EXECUTE format('ALTER TABLE users DROP CONSTRAINT IF EXISTS %I', cname);
+  END LOOP;
+  ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'employee'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
 END $$;
 `;

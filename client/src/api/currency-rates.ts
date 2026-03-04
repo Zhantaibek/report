@@ -8,5 +8,9 @@ export interface CurrencyRate {
 }
 
 export function getCurrencyRates(): Promise<CurrencyRate[]> {
-  return api.get('/currency-rates');
+  return api.get('/currency-rates/latest');
+}
+
+export function refreshCurrencyRates(): Promise<{ ok: boolean; status: 'updated' | 'skipped'; rates: CurrencyRate[] }> {
+  return api.post('/currency-rates/refresh', {});
 }

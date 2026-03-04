@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Loader2, Search } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 
 const Select = SelectPrimitive.Root;
@@ -147,6 +147,7 @@ interface SelectWithSearchProps {
   value?: string;
   onValueChange?: (value: string) => void;
   disabled?: boolean;
+  loading?: boolean;
   placeholder?: string;
   searchPlaceholder?: string;
   options?: SelectOption[];
@@ -159,6 +160,7 @@ function SelectWithSearch({
   value,
   onValueChange,
   disabled,
+  loading,
   placeholder,
   searchPlaceholder = 'Поиск...',
   options,
@@ -229,8 +231,8 @@ function SelectWithSearch({
       {/* Trigger */}
       <button
         type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        disabled={disabled || loading}
+        onClick={() => !(disabled || loading) && setOpen((v) => !v)}
         className={cn(
           'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
           triggerClassName
@@ -239,7 +241,10 @@ function SelectWithSearch({
         <span className={cn('flex-1 text-left truncate', !selectedLabel && 'text-muted-foreground')}>
           {selectedLabel ?? placeholder ?? ''}
         </span>
-        <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+        {loading
+          ? <Loader2 className="h-4 w-4 opacity-50 shrink-0 ml-2 animate-spin" />
+          : <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+        }
       </button>
 
       {/* Dropdown */}
@@ -247,7 +252,7 @@ function SelectWithSearch({
         <div
           ref={listRef}
           className="absolute z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md"
-          style={{ maxHeight: '18rem', display: 'flex', flexDirection: 'column', minWidth: '100%', width: 'max-content', maxWidth: '420px' }}
+          style={{ maxHeight: '25rem', display: 'flex', flexDirection: 'column', minWidth: '100%', width: 'max-content', maxWidth: '620px' }}
         >
           {/* Search input */}
           <div className="flex items-center gap-1.5 border-b px-2 py-1.5 shrink-0">
@@ -276,8 +281,8 @@ function SelectWithSearch({
                 key={opt.value}
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                 className={cn(
-                  'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm outline-none hover:bg-muted',
-                  opt.value === value && 'bg-muted font-medium'
+                  'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
+                  opt.value === value && 'bg-muted'
                 )}
               >
                 <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
@@ -299,8 +304,8 @@ function SelectWithSearch({
                     key={opt.value}
                     onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                     className={cn(
-                      'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm outline-none hover:bg-muted',
-                      opt.value === value && 'bg-muted font-medium'
+                      'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
+                      opt.value === value && 'bg-muted'
                     )}
                   >
                     <span className="absolute left-3 flex h-4 w-4 items-center justify-center">

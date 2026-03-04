@@ -4,8 +4,6 @@ import Layout from './components/Layout.tsx';
 import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import Reports from './pages/Reports.tsx';
-import DataSources from './pages/admin/DataSources.tsx';
-import Brokers from './pages/admin/Brokers.tsx';
 import Users from './pages/admin/Users.tsx';
 import ReportFormsAdmin from './pages/admin/ReportForms.tsx';
 
@@ -46,22 +44,6 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Reports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/data-sources"
-          element={
-            <ProtectedRoute>
-              <AdminRoute><DataSources /></AdminRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/brokers"
-          element={
-            <ProtectedRoute>
-              <AdminRoute><Brokers /></AdminRoute>
             </ProtectedRoute>
           }
         />

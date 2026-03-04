@@ -10,7 +10,13 @@ import { config } from '../config/index.js';
 /**
  * Делаем запрос к НБКР и сохраняем курс USD в БД.
  */
-export async function fetchAndSaveRates(): Promise<void> {
+export interface RefreshResult {
+  updated: string[];
+  skipped: string[];
+}
+
+export async function fetchAndSaveRates(): Promise<RefreshResult> {
+  const result: RefreshResult = { updated: [], skipped: [] };
   try {
     const url = config.currency.apiUrl;
     console.log(`[currency-job] Fetching rates from ${url}`);
@@ -18,10 +24,9 @@ export async function fetchAndSaveRates(): Promise<void> {
     const res = await fetch(url, { headers: { Accept: '*/*' } });
     if (!res.ok) {
       console.error(`[currency-job] HTTP error ${res.status}`);
-      return;
+      return result;
     }
 
-    // НБКР отдаёт windows-1251, Node.js fetch возвращает ArrayBuffer → декодируем вручную
     const buffer = await res.arrayBuffer();
     let text: string;
     try {
@@ -31,15 +36,16 @@ export async function fetchAndSaveRates(): Promise<void> {
       text = new TextDecoder('utf-8').decode(buffer);
     }
 
-    const saved = parseAndSaveNbkrXml(text);
-    if (saved.length === 0) {
+    await parseAndSaveNbkrXml(text, result);
+    if (result.updated.length === 0 && result.skipped.length === 0) {
       console.warn('[currency-job] No rates found in NBKR response');
     } else {
-      console.log(`[currency-job] Saved rates: ${saved.join(', ')}`);
+      console.log(`[currency-job] Updated: ${result.updated.join(', ') || '—'}, Skipped: ${result.skipped.join(', ') || '—'}`);
     }
   } catch (err) {
     console.error('[currency-job] Fetch error:', err);
   }
+  return result;
 }
 
 /**
@@ -54,15 +60,10 @@ export async function fetchAndSaveRates(): Promise<void> {
  *     </currency>
  *   </rates>
  */
-function parseAndSaveNbkrXml(xml: string): string[] {
+async function parseAndSaveNbkrXml(xml: string, result: RefreshResult): Promise<void> {
   const TARGET_CODES = ['USD'];
-  const saved: string[] = [];
 
-  // Дата из атрибута корневого элемента: date="DD.MM.YYYY"
-  const dateAttr = xml.match(/<rates[^>]+date="(\d{2})\.(\d{2})\.(\d{4})"/i);
-  const rateDate = dateAttr
-    ? `${dateAttr[3]}-${dateAttr[2]}-${dateAttr[1]}`  // → YYYY-MM-DD
-    : new Date().toISOString().slice(0, 10);
+  const rateDate = new Date().toISOString().slice(0, 10);
 
   for (const code of TARGET_CODES) {
     const blockRe = new RegExp(
@@ -75,17 +76,16 @@ function parseAndSaveNbkrXml(xml: string): string[] {
     const valueStr = block.match(/<value>([\d,. ]+)<\/value>/i)?.[1];
     if (!valueStr) continue;
 
-    // Убираем пробелы-разделители тысяч, меняем запятую на точку
     const rate = parseFloat(valueStr.replace(/\s/g, '').replace(',', '.'));
     if (!isFinite(rate) || rate <= 0) continue;
 
-    upsertCurrencyRate(code, rate, rateDate)
-      .then(() => {})
-      .catch((err) => console.error(`[currency-job] DB error for ${code}:`, err));
-    saved.push(`${code}=${rate} (${rateDate})`);
+    try {
+      await upsertCurrencyRate(code, rate, rateDate);
+      result.updated.push(`${code}=${rate} (${rateDate})`);
+    } catch (err) {
+      console.error(`[currency-job] DB error for ${code}:`, err);
+    }
   }
-
-  return saved;
 }
 
 /**

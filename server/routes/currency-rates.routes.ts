@@ -25,16 +25,12 @@ router.get('/', async (_req, res) => {
   res.json(rates.map(mapRow));
 });
 
-/** Ручное обновление курса (только для admin) */
-router.post('/refresh', async (req, res) => {
-  const user = (req as any).user;
-  if (user?.role !== 'admin') {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
-  await fetchAndSaveRates();
+/** Обновление курса */
+router.post('/refresh', async (_req, res) => {
+  const result = await fetchAndSaveRates();
   const rates = await getLatestCurrencyRates();
-  res.json({ ok: true, rates: rates.map(mapRow) });
+  const status = result.updated.length > 0 ? 'updated' : 'skipped';
+  res.json({ ok: true, status, rates: rates.map(mapRow) });
 });
 
 export default router;
