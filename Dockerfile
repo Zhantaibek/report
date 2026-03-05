@@ -18,6 +18,8 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/client/dist ./client/dist
 COPY server/oracle-bridge ./server/oracle-bridge
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
 ENV NODE_ENV=production
 EXPOSE 3001
-CMD ["node", "server/dist/index.js"]
+ENTRYPOINT ["./entrypoint.sh"]
