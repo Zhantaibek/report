@@ -30,7 +30,10 @@ deploy:
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - |
       if [ -f "$SSH_PRIVATE_KEY" ]; then
-        cp "$SSH_PRIVATE_KEY" ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa && ssh-add ~/.ssh/id_rsa
+        cp "$SSH_PRIVATE_KEY" ~/.ssh/id_rsa
+        sed -i 's/\r$//' ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-add ~/.ssh/id_rsa
       elif [ -n "$SSH_PRIVATE_KEY_B64" ]; then
         echo "$SSH_PRIVATE_KEY_B64" | tr -d '\n\r\t ' | base64 -d | ssh-add -
       else
