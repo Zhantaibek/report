@@ -5,7 +5,8 @@ import { config } from '../config/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JAVA_BIN = process.env.JAVA_BIN ?? '/usr/bin/java';
-const BRIDGE_DIR = path.join(__dirname, '..', 'oracle-bridge');
+// Из dist (`server/dist/data-sources`) поднимаемся на уровень `server` и идём в `oracle-bridge`
+const BRIDGE_DIR = path.join(__dirname, '..', '..', 'oracle-bridge');
 const defaultJdbc =
   process.platform === 'win32'
     ? 'C:\\oracle\\ora81\\jdbc\\lib\\classes12.zip;C:\\oracle\\ora81\\jdbc\\lib\\nls_charset12.zip'
