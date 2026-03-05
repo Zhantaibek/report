@@ -14,6 +14,7 @@ import Form1Report, {
 } from '../components/reports/Form1Report.tsx';
 import Form2Report, {
   type ReportTradesForm2Data,
+  type ClassGroupForm2,
 } from '../components/reports/Form2Report.tsx';
 import Form3Report, {
   type ReportTradesForm3Data,
@@ -472,7 +473,7 @@ export default function Reports() {
             <>
               <div className="border-t border-border mt-2 mb-4 print:hidden" />
               {/* Если Blank_Form_1 — показываем группированный шаблон */}
-              {groupedResult && selectedForm.code === 'Blank_Form_1' && result && result.rows.length > 0 && (
+              {groupedResult && selectedForm.code === 'Blank_Form_1' && result && (result.type === 'table' || result.type === 'summary') && result.rows.length > 0 && (
                 <>
                   {/* Отчет */}
                   <div className="mt-6" key={`form1-page-${page}`}>
@@ -872,7 +873,7 @@ export default function Reports() {
                   <>
                     {paged.map((row, idx) => {
                       const data: ExchangeContractData = {
-                        id: row.id ?? '',
+                        id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
                         tradeDate: String(row.tradeDate ?? ''),
                         classCode: String(row.classCode ?? ''),
                         secCode: String(row.secCode ?? ''),
@@ -907,7 +908,7 @@ export default function Reports() {
                   <>
                     {paged.map((row, idx) => {
                       const data: ExchangeCertificateData = {
-                        id: row.id ?? '',
+                        id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
                         tradeDate: String(row.tradeDate ?? ''),
                         classCode: String(row.classCode ?? ''),
                         secCode: String(row.secCode ?? ''),
@@ -1128,22 +1129,6 @@ function formatDate(d: unknown): string {
 }
 
 // Группировка для Формы 2: Класс → ЦБ → агрегация по дате
-interface ClassGroupForm2 {
-  classId: string;
-  securities: {
-    securityId: string;
-    tradeDate: string;
-    tradesCount: number;
-    totalQuantity: number;
-    maxPrice: number;
-    minPrice: number;
-    avgPrice: number;
-    lastTradePrice: number;
-    lastTradeQuantity: number;
-    lastTradeAmount: number;
-  }[];
-}
-
 function groupByClassAndSecForm2(rows: Record<string, unknown>[]): ClassGroupForm2[] {
   const classMap = new Map<string, Map<string, Record<string, unknown>[]>>();
 
