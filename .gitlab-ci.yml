@@ -2,9 +2,9 @@ stages:
   - build
   - deploy
 
-variables:
-  NODE_ENV: production
-  SSH_PORT: "22"
+# variables:
+#   NODE_ENV: production
+#   SSH_PORT: "22"
 
 build:
   stage: build
