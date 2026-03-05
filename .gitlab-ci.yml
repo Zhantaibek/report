@@ -28,11 +28,14 @@ deploy:
     - apk add --no-cache openssh-client git
     - eval $(ssh-agent -s)
     - |
-      if [ -z "$SSH_PRIVATE_KEY_B64" ]; then
-        echo "ERROR: Add CI/CD variable SSH_PRIVATE_KEY_B64 (base64 of private key). On server run: base64 -w 0 ~/.ssh/gitlab_ci_deploy"
+      if [ -f "$SSH_PRIVATE_KEY" ]; then
+        ssh-add "$SSH_PRIVATE_KEY"
+      elif [ -n "$SSH_PRIVATE_KEY_B64" ]; then
+        echo "$SSH_PRIVATE_KEY_B64" | tr -d '\n\r\t ' | base64 -d | ssh-add -
+      else
+        echo "ERROR: Set CI/CD variable. Option A: SSH_PRIVATE_KEY (Type=File), paste full private key. Option B: SSH_PRIVATE_KEY_B64, run on server: base64 -w 0 ~/.ssh/gitlab_ci_deploy and paste ONE line (no line breaks)."
         exit 1
       fi
-      echo "$SSH_PRIVATE_KEY_B64" | base64 -d | ssh-add -
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts || true
   script:
