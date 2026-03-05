@@ -2,5 +2,5 @@ node_modules
 dist
 .env
 .env.local
-server/oracle-bridge/jdbc/*.zip
-server/oracle-bridge/jdbc/*.jar
+# server/oracle-bridge/jdbc/*.zip
+# server/oracle-bridge/jdbc/*.jar
