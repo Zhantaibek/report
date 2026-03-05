@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const JAVA_BIN = process.env.JAVA_BIN ?? 'java';
 const BRIDGE_DIR = path.join(__dirname, '..', 'oracle-bridge');
 const defaultJdbc =
   process.platform === 'win32'
@@ -29,7 +28,7 @@ function runJavaBridge(className: string, args: string[]): Promise<string> {
   const { host, port, sid, user, password } = config.oracle;
   return new Promise((resolve, reject) => {
     execFile(
-      JAVA_BIN,
+      'java',
       ['-cp', [BRIDGE_DIR, OJDBC_JAR].join(path.delimiter), className, host, String(port), sid, user, password, ...args],
       { cwd: BRIDGE_DIR, timeout: 30000 },
       (err, stdout, stderr) => {
