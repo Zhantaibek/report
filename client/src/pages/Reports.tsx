@@ -31,6 +31,7 @@ import { ExchangeContractReport, type ExchangeContractData } from '../components
 import { ExchangeCertificateReport, type ExchangeCertificateData } from '../components/reports/ExchangeCertificateReport.tsx';
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
+import { DateInput } from '../components/ui/date-input.tsx';
 
 export default function Reports() {
   const [forms, setForms] = useState<ReportForm[]>([]);
@@ -39,8 +40,8 @@ export default function Reports() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedFormId, setSelectedFormId] = useState<string>('');
   const [filters, setFilters] = useState<RunFilters>({
-    dateFrom: '2025-01-10',
-    dateTo: '2026-02-13',
+    dateFrom: undefined,
+    dateTo: undefined,
   });
   const [result, setResult] = useState<ReportResult | null>(null);
   const [usdRows, setUsdRows] = useState<UsdReportRow[] | null>(null);
@@ -380,17 +381,12 @@ export default function Reports() {
                     <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                       Дата <span className="text-destructive">*</span>
                     </label>
-                    <input
-                      type="date"
-                      value={filters.dateFrom ?? ''}
-                      onChange={(e) => {
-                        const date = e.target.value || undefined;
-                        setFilters({ ...filters, dateFrom: date, dateTo: date });
-                      }}
+                    <DateInput
+                      value={filters.dateFrom}
+                      onChange={(date) => setFilters({ ...filters, dateFrom: date, dateTo: date })}
                       disabled={!selectedFormId}
-                      className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none transition"
-                      onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(61,132,140,0.2)'; e.target.style.borderColor = '#3d848c'; }}
-                      onBlur={(e) => { e.target.style.boxShadow = ''; e.target.style.borderColor = ''; }}
+                      required
+                      className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
                     />
                   </div>
                 ) : (
@@ -399,14 +395,12 @@ export default function Reports() {
                       <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                         Дата с <span className="text-destructive">*</span>
                       </label>
-                      <input
-                        type="date"
-                        value={filters.dateFrom ?? ''}
-                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value || undefined })}
+                      <DateInput
+                        value={filters.dateFrom}
+                        onChange={(date) => setFilters({ ...filters, dateFrom: date })}
                         disabled={!selectedFormId}
-                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none transition"
-                        onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(61,132,140,0.2)'; e.target.style.borderColor = '#3d848c'; }}
-                        onBlur={(e) => { e.target.style.boxShadow = ''; e.target.style.borderColor = ''; }}
+                        required
+                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
                       />
                     </div>
                     <span className="text-muted-foreground self-end mb-2.5">—</span>
@@ -414,14 +408,12 @@ export default function Reports() {
                       <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                         Дата по <span className="text-destructive">*</span>
                       </label>
-                      <input
-                        type="date"
-                        value={filters.dateTo ?? ''}
-                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value || undefined })}
+                      <DateInput
+                        value={filters.dateTo}
+                        onChange={(date) => setFilters({ ...filters, dateTo: date })}
                         disabled={!selectedFormId}
-                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none transition"
-                        onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(61,132,140,0.2)'; e.target.style.borderColor = '#3d848c'; }}
-                        onBlur={(e) => { e.target.style.boxShadow = ''; e.target.style.borderColor = ''; }}
+                        required
+                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
                       />
                     </div>
                   </>
@@ -875,12 +867,17 @@ export default function Reports() {
                       const data: ExchangeContractData = {
                         id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
                         tradeDate: String(row.tradeDate ?? ''),
+                        tradeDateTime: row.tradeDateTime != null ? String(row.tradeDateTime) : null,
                         classCode: String(row.classCode ?? ''),
+                        className: row.className != null ? String(row.className) : undefined,
                         secCode: String(row.secCode ?? ''),
+                        secFullName: row.secFullName != null ? String(row.secFullName) : undefined,
                         sellerName: row.sellerName != null ? String(row.sellerName) : null,
                         sellAccount: row.sellAccount != null ? String(row.sellAccount) : null,
+                        sellerClientCode: row.sellerClientCode != null ? String(row.sellerClientCode) : null,
                         buyerName: row.buyerName != null ? String(row.buyerName) : null,
                         buyAccount: row.buyAccount != null ? String(row.buyAccount) : null,
+                        buyerClientCode: row.buyerClientCode != null ? String(row.buyerClientCode) : null,
                         quantity: Number(row.quantity ?? 0),
                         price: Number(row.price ?? 0),
                         value: Number(row.value ?? 0),
@@ -910,16 +907,25 @@ export default function Reports() {
                       const data: ExchangeCertificateData = {
                         id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
                         tradeDate: String(row.tradeDate ?? ''),
+                        tradeDateTime: row.tradeDateTime != null ? String(row.tradeDateTime) : null,
                         classCode: String(row.classCode ?? ''),
+                        className: row.className != null ? String(row.className) : undefined,
                         secCode: String(row.secCode ?? ''),
+                        secFullName: row.secFullName != null ? String(row.secFullName) : undefined,
                         sellerName: row.sellerName != null ? String(row.sellerName) : null,
                         sellAccount: row.sellAccount != null ? String(row.sellAccount) : null,
+                        sellerClientCode: row.sellerClientCode != null ? String(row.sellerClientCode) : null,
                         buyerName: row.buyerName != null ? String(row.buyerName) : null,
                         buyAccount: row.buyAccount != null ? String(row.buyAccount) : null,
+                        buyerClientCode: row.buyerClientCode != null ? String(row.buyerClientCode) : null,
                         quantity: Number(row.quantity ?? 0),
                         price: Number(row.price ?? 0),
                         value: Number(row.value ?? 0),
                         settleDate: row.settleDate != null ? String(row.settleDate) : null,
+                        couponRate: row.couponRate != null ? Number(row.couponRate) : null,
+                        yield: row.yield != null ? Number(row.yield) : null,
+                        sellerCommission: row.sellerCommission != null ? Number(row.sellerCommission) : null,
+                        buyerCommission: row.buyerCommission != null ? Number(row.buyerCommission) : null,
                       };
                       return (
                         <div key={`exchange-cert-${row.id ?? idx}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
@@ -960,6 +966,7 @@ export default function Reports() {
                         sec_code: String(r.sec_code ?? ''),
                         trade_date: String(r.trade_date ?? ''),
                         class_code: String(r.class_code ?? ''),
+                        class_name: r.class_name != null ? String(r.class_name) : undefined,
                         sec_full_name: String(r.sec_full_name ?? ''),
                         face_value: Number(r.face_value ?? 100),
                         issue_qty: Number(r.issue_qty ?? 0),
@@ -1064,21 +1071,27 @@ interface TradeRow {
 
 interface SecurityGroup {
   securityId: string;
+  secFullName?: string;
   trades: TradeRow[];
 }
 
 interface ClassGroup {
   classId: string;
+  className?: string;
   securities: SecurityGroup[];
 }
 
 function groupByClassAndSec(rows: Record<string, unknown>[]): ClassGroup[] {
   const classMap = new Map<string, Map<string, TradeRow[]>>();
+  const classCodeToName = new Map<string, string>();
+  const secCodeToFullName = new Map<string, string>();
 
   for (const row of rows) {
     const classCode = String(row.classCode ?? 'Без класса');
     const secCode = String(row.secCode ?? 'Без кода');
-    
+    if (!classCodeToName.has(classCode) && row.className != null) classCodeToName.set(classCode, String(row.className));
+    if (!secCodeToFullName.has(secCode) && row.secFullName != null) secCodeToFullName.set(secCode, String(row.secFullName));
+
     // CPFirmId (counterparty) = покупатель, FirmId (broker) = продавец
     const seller = String(row.brokerName ?? '');
     const buyer = String(row.counterpartyName ?? '');
@@ -1108,9 +1121,9 @@ function groupByClassAndSec(rows: Record<string, unknown>[]): ClassGroup[] {
   for (const [classId, secMap] of classMap.entries()) {
     const securities: SecurityGroup[] = [];
     for (const [securityId, trades] of secMap.entries()) {
-      securities.push({ securityId, trades });
+      securities.push({ securityId, secFullName: secCodeToFullName.get(securityId) ?? securityId, trades });
     }
-    classes.push({ classId, securities });
+    classes.push({ classId, className: classCodeToName.get(classId) ?? classId, securities });
   }
 
   return classes;
@@ -1131,12 +1144,15 @@ function formatDate(d: unknown): string {
 // Группировка для Формы 2: Класс → ЦБ → агрегация по дате
 function groupByClassAndSecForm2(rows: Record<string, unknown>[]): ClassGroupForm2[] {
   const classMap = new Map<string, Map<string, Record<string, unknown>[]>>();
+  const classCodeToName = new Map<string, string>();
+  const secCodeToFullName = new Map<string, string>();
 
-  // Группируем по классу и ЦБ
   for (const row of rows) {
     const classCode = String(row.classCode ?? 'Без класса');
     const secCode = String(row.secCode ?? 'Без кода');
-    
+    if (!classCodeToName.has(classCode) && row.className != null) classCodeToName.set(classCode, String(row.className));
+    if (!secCodeToFullName.has(secCode) && row.secFullName != null) secCodeToFullName.set(secCode, String(row.secFullName));
+
     if (!classMap.has(classCode)) {
       classMap.set(classCode, new Map());
     }
@@ -1172,6 +1188,7 @@ function groupByClassAndSecForm2(rows: Record<string, unknown>[]): ClassGroupFor
       
       securities.push({
         securityId,
+        secFullName: secCodeToFullName.get(securityId) ?? securityId,
         tradeDate,
         tradesCount,
         totalQuantity,
@@ -1185,7 +1202,7 @@ function groupByClassAndSecForm2(rows: Record<string, unknown>[]): ClassGroupFor
       });
     }
     
-    classes.push({ classId, securities });
+    classes.push({ classId, className: classCodeToName.get(classId) ?? classId, securities });
   }
 
   return classes;
@@ -1222,8 +1239,10 @@ function groupByParticipantAndClassAndSec(rows: Record<string, unknown>[]): Part
       const securities: ParticipantGroup['classes'][0]['securities'] = [];
       
       for (const [secCode, trades] of secMap.entries()) {
+        const secFullName = (trades[0] as Record<string, unknown>)?.secFullName != null ? String((trades[0] as Record<string, unknown>).secFullName) : secCode;
         securities.push({
           secCode,
+          secFullName,
           trades: trades.map(t => ({
             id: String(t.id ?? ''),
             tradeDate: formatDate(t.tradeDate),
@@ -1236,8 +1255,8 @@ function groupByParticipantAndClassAndSec(rows: Record<string, unknown>[]): Part
           })),
         });
       }
-      
-      classes.push({ classCode, securities });
+      const firstName = (() => { for (const [, arr] of secMap) if (arr[0]?.className != null) return String(arr[0].className); return classCode; })();
+      classes.push({ classCode, className: firstName, securities });
     }
     
     participants.push({ participantName, classes });
@@ -1249,11 +1268,12 @@ function groupByParticipantAndClassAndSec(rows: Record<string, unknown>[]): Part
 // Группировка для формы 6A: Класс -> ЦБ -> Сделки
 function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
   const classMap = new Map<string, Map<string, Record<string, unknown>[]>>();
+  const classCodeToName = new Map<string, string>();
 
-  // Группируем по классу -> secCode
   for (const row of rows) {
     const classCode = String(row.classCode ?? 'Без класса');
     const secCode = String(row.secCode ?? 'Без кода');
+    if (!classCodeToName.has(classCode) && row.className != null) classCodeToName.set(classCode, String(row.className));
 
     if (!classMap.has(classCode)) {
       classMap.set(classCode, new Map());
@@ -1317,6 +1337,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
 
       securities.push({
         secCode,
+        secFullName: String(tradesData[0]?.secFullName ?? secCode),
         trades,
         totalTrades: tradesData.length,
         totalQuantity: secTotalQty,
@@ -1336,6 +1357,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
 
     classes.push({
       classCode,
+      className: classCodeToName.get(classCode) ?? classCode,
       securities,
       totalTrades: classUniqueTradeIds.size,
       totalSecurities: securities.length,
@@ -1366,11 +1388,12 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
   }[];
 }[] {
   const classMap = new Map<string, Map<string, Record<string, unknown>[]>>();
+  const classCodeToName = new Map<string, string>();
 
-  // Группируем по классу -> secCode
   for (const row of rows) {
     const classCode = String(row.classCode ?? 'Без класса');
     const secCode = String(row.secCode ?? 'Без кода');
+    if (!classCodeToName.has(classCode) && row.className != null) classCodeToName.set(classCode, String(row.className));
 
     if (!classMap.has(classCode)) {
       classMap.set(classCode, new Map());
@@ -1384,6 +1407,7 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
 
   const classes: {
     classCode: string;
+    className?: string;
     securities: {
       secCode: string;
       secFullName: string;
@@ -1431,6 +1455,7 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
 
     classes.push({
       classCode,
+      className: classCodeToName.get(classCode) ?? classCode,
       securities,
     });
   }

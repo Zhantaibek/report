@@ -1,5 +1,6 @@
 import { Label } from './ui/label.tsx';
 import { Input } from './ui/input.tsx';
+import { DateInput } from './ui/date-input.tsx';
 import {
   Select,
   SelectContent,
@@ -25,14 +26,9 @@ export default function ReportFilters({ filters, onChange, disabled, singleDate 
           <Label>
             Дата <span className="text-destructive">*</span>
           </Label>
-          <Input
-            type="date"
-            value={filters.dateFrom ?? ''}
-            onChange={(e) => {
-              const date = e.target.value || undefined;
-              onChange({ ...filters, dateFrom: date, dateTo: date });
-            }}
-            className="w-40"
+          <DateInput
+            value={filters.dateFrom}
+            onChange={(date) => onChange({ ...filters, dateFrom: date, dateTo: date })}
             disabled={disabled}
             required
           />
@@ -44,11 +40,9 @@ export default function ReportFilters({ filters, onChange, disabled, singleDate 
             <Label>
               Дата с <span className="text-destructive">*</span>
             </Label>
-            <Input
-              type="date"
-              value={filters.dateFrom ?? ''}
-              onChange={(e) => onChange({ ...filters, dateFrom: e.target.value || undefined })}
-              className="w-40"
+            <DateInput
+              value={filters.dateFrom}
+              onChange={(date) => onChange({ ...filters, dateFrom: date })}
               disabled={disabled}
               required
             />
@@ -57,11 +51,9 @@ export default function ReportFilters({ filters, onChange, disabled, singleDate 
             <Label>
               Дата по <span className="text-destructive">*</span>
             </Label>
-            <Input
-              type="date"
-              value={filters.dateTo ?? ''}
-              onChange={(e) => onChange({ ...filters, dateTo: e.target.value || undefined })}
-              className="w-40"
+            <DateInput
+              value={filters.dateTo}
+              onChange={(date) => onChange({ ...filters, dateTo: date })}
               disabled={disabled}
               required
             />

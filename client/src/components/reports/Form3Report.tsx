@@ -19,11 +19,13 @@ export interface TradeItem {
 
 export interface SecurityGroup {
   secCode: string;
+  secFullName?: string;
   trades: TradeItem[];
 }
 
 export interface ClassGroup {
   classCode: string;
+  className?: string;
   securities: SecurityGroup[];
 }
 
@@ -87,7 +89,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
 
       {/* Таблица */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm table-fixed">
           <thead>
             <tr className="bg-muted/60">
               <th className="border border-border px-3 py-2 text-center font-medium">
@@ -99,10 +101,10 @@ export default function Form3Report({ data, className, showTotalSummary = true }
               <th className="border border-border px-3 py-2 text-center font-medium">
                 Дата исполнения
               </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
+              <th className="border border-border px-3 py-2 text-center font-medium w-[18%]">
                 Продавец
               </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
+              <th className="border border-border px-3 py-2 text-center font-medium w-[18%]">
                 Покупатель
               </th>
               <th className="border border-border px-3 py-2 text-right font-medium">
@@ -122,7 +124,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                 <React.Fragment key={pIdx}>
                   {/* Заголовок участника */}
                   <tr className="bg-muted/80">
-                    <td colSpan={8} className="border border-border px-3 py-2 font-semibold">
+                    <td colSpan={8} className="border border-border px-3 py-2 font-semibold break-words">
                       Участник торгов: {participant.participantName}
                     </td>
                   </tr>
@@ -132,7 +134,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                       {/* Заголовок класса */}
                       <tr className="bg-muted/60">
                         <td colSpan={8} className="border border-border px-3 py-2 font-medium">
-                          Класс: {cls.classCode}
+                          Класс: {cls.className ?? cls.classCode}
                         </td>
                       </tr>
                       
@@ -145,7 +147,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                             {/* Заголовок ценной бумаги */}
                             <tr className="bg-muted/40">
                               <td colSpan={8} className="border border-border px-3 py-2 text-sm">
-                                Ценная бумага: {sec.secCode}
+                                Ценная бумага: {sec.secFullName ?? sec.secCode}
                               </td>
                             </tr>
                             
@@ -155,8 +157,8 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                                   <td className="border border-border px-3 py-2 text-center">{trade.id}</td>
                                   <td className="border border-border px-3 py-2 text-center">{formatDate(trade.tradeDate)}</td>
                                   <td className="border border-border px-3 py-2 text-center">{formatDate(trade.settleDate)}</td>
-                                  <td className="border border-border px-3 py-2">{trade.brokerName}</td>
-                                  <td className="border border-border px-3 py-2">{trade.counterpartyName}</td>
+                                  <td className="border border-border px-3 py-2 break-words align-top">{trade.brokerName}</td>
+                                  <td className="border border-border px-3 py-2 break-words align-top">{trade.counterpartyName}</td>
                                   <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(trade.price)}</td>
                                   <td className="border border-border px-3 py-2 text-right tabular-nums">{formatInt(trade.quantity)}</td>
                                   <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(trade.value)}</td>

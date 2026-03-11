@@ -4,7 +4,10 @@ import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const JAVA_BIN = process.env.JAVA_BIN ?? '/usr/bin/java';
+// Если JAVA_BIN не задан, используем:
+// - 'java' на Windows (берётся из PATH / App Execution Aliases)
+// - '/usr/bin/java' в Linux (как в Docker-образе)
+const JAVA_BIN = process.env.JAVA_BIN || (process.platform === 'win32' ? 'java' : '/usr/bin/java');
 // Из dist (`server/dist/data-sources`) поднимаемся на уровень `server` и идём в `oracle-bridge`
 const BRIDGE_DIR = path.join(__dirname, '..', '..', 'oracle-bridge');
 const defaultJdbc =
@@ -29,6 +32,11 @@ export interface OracleInstrument {
 function runJavaBridge(className: string, args: string[]): Promise<string> {
   const { host, port, sid, user, password } = config.oracle;
   return new Promise((resolve, reject) => {
+    console.log('[oracle-jdbc]', {
+      javaBin: JAVA_BIN,
+      bridgeDir: BRIDGE_DIR,
+      className,
+    });
     execFile(
       JAVA_BIN,
       ['-cp', [BRIDGE_DIR, OJDBC_JAR].join(path.delimiter), className, host, String(port), sid, user, password, ...args],

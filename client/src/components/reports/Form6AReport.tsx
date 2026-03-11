@@ -37,6 +37,7 @@ export interface TradeData {
 // Данные по ценной бумаге
 export interface SecurityData {
   secCode: string;
+  secFullName?: string;
   trades: TradeData[];
   totalTrades: number;
   totalQuantity: number; // Общее количество ЦБ
@@ -49,6 +50,7 @@ export interface SecurityData {
 // Данные по классу
 export interface ClassData {
   classCode: string;
+  className?: string;
   securities: SecurityData[];
   totalTrades: number;
   totalSecurities: number;
@@ -99,7 +101,7 @@ export function Form6AReport({ data }: Props) {
                 {/* Класс заголовок */}
                 <tr className="bg-muted/70">
                   <td colSpan={8} className="border border-border px-3 py-2 font-semibold">
-                    Класс: {cls.classCode}
+                    Класс: {cls.className ?? cls.classCode}
                   </td>
                 </tr>
 
@@ -109,7 +111,7 @@ export function Form6AReport({ data }: Props) {
                     {/* ЦБ заголовок */}
                     <tr className="bg-muted/50">
                       <td colSpan={8} className="border border-border px-3 py-2 font-medium">
-                        Ценная Бумага: {sec.secCode}
+                        Ценная Бумага: {sec.secFullName ?? sec.secCode}
                       </td>
                     </tr>
 

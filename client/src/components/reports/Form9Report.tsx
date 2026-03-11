@@ -23,6 +23,7 @@ export interface SecurityGroup {
 
 export interface ClassGroup {
   classCode: string;
+  className?: string;
   securities: SecurityGroup[];
 }
 
@@ -99,7 +100,7 @@ export function Form9Report({ data }: { data: ReportForm9Data }) {
                     colSpan={6}
                     className="border border-border px-3 py-1.5 font-medium"
                   >
-                    Класс: {cls.classCode}
+                    Класс: {cls.className ?? cls.classCode}
                   </td>
                 </tr>
 

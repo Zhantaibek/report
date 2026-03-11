@@ -8,6 +8,7 @@ import { ReportHeader } from './ReportHeader';
 
 export interface SecuritySummary {
   securityId: string;
+  secFullName?: string;
   tradeDate: string;
   tradesCount: number;
   totalQuantity: number;
@@ -22,6 +23,7 @@ export interface SecuritySummary {
 
 export interface ClassGroupForm2 {
   classId: string;
+  className?: string;
   securities: SecuritySummary[];
 }
 
@@ -89,11 +91,15 @@ export default function Form2Report({ data, className, showTotalSummary = true }
               <th className="border border-border px-3 py-2 text-right font-medium">
                 Средняя цена
               </th>
+              <th className="border border-border px-3 py-2 text-right font-medium">
+                Объем сделок
+              </th>
               <th colSpan={3} className="border border-border px-3 py-2 text-center font-medium">
                 Последняя сделка
               </th>
             </tr>
             <tr className="bg-muted/60">
+              <th className="border border-border px-3 py-2"></th>
               <th className="border border-border px-3 py-2"></th>
               <th className="border border-border px-3 py-2"></th>
               <th className="border border-border px-3 py-2"></th>
@@ -112,10 +118,10 @@ export default function Form2Report({ data, className, showTotalSummary = true }
                   {/* Класс */}
                   <tr className="bg-muted/50">
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="border border-border px-3 py-1.5 font-medium"
                     >
-                      Класс: {cls.classId}
+                      Класс: {cls.className ?? cls.classId}
                     </td>
                   </tr>
                   {cls.securities.map((sec) => {
@@ -124,10 +130,10 @@ export default function Form2Report({ data, className, showTotalSummary = true }
                         {/* Ценная бумага */}
                         <tr className="bg-muted/40">
                           <td
-                            colSpan={9}
+                            colSpan={10}
                             className="border border-border px-3 py-1.5 font-medium"
                           >
-                            Ценная бумага: {sec.securityId}
+                            Ценная бумага: {sec.secFullName ?? sec.securityId}
                           </td>
                         </tr>
                         {/* Строка данных */}
@@ -149,6 +155,9 @@ export default function Form2Report({ data, className, showTotalSummary = true }
                           </td>
                           <td className="border border-border px-3 py-2 text-right tabular-nums">
                             {formatNumber(sec.avgPrice)}
+                          </td>
+                          <td className="border border-border px-3 py-2 text-right tabular-nums">
+                            {formatNumber(sec.totalAmount)}
                           </td>
                           <td className="border border-border px-3 py-2 text-right tabular-nums">
                             {formatNumber(sec.lastTradePrice)}
@@ -174,6 +183,9 @@ export default function Form2Report({ data, className, showTotalSummary = true }
                           <td className="border border-border px-3 py-2" />
                           <td className="border border-border px-3 py-2" />
                           <td className="border border-border px-3 py-2" />
+                          <td className="border border-border px-3 py-2 text-right tabular-nums">
+                            {formatNumber(sec.totalAmount)}
+                          </td>
                           <td className="border border-border px-3 py-2" />
                           <td className="border border-border px-3 py-2" />
                           <td className="border border-border px-3 py-2" />
@@ -198,11 +210,12 @@ export default function Form2Report({ data, className, showTotalSummary = true }
                 <td className="border border-border px-3 py-2" />
                 <td className="border border-border px-3 py-2" />
                 <td className="border border-border px-3 py-2" />
-                <td className="border border-border px-3 py-2" />
-                <td className="border border-border px-3 py-2" />
                 <td className="border border-border px-3 py-2 text-right tabular-nums">
                   {formatNumber(data.totalSummary.totalAmount)}
                 </td>
+                <td className="border border-border px-3 py-2" />
+                <td className="border border-border px-3 py-2" />
+                <td className="border border-border px-3 py-2" />
               </tr>
             )}
           </tbody>

@@ -13,32 +13,38 @@ export interface ReportDefinition {
 }
 
 /**
- * Базовый SQL-запрос для получения уникальных сделок
+ * Базовый SQL-запрос для получения уникальных сделок.
+ * Продавец/покупатель через JOIN по Operation (Купля/Продажа).
  */
 const baseTradesQuery = `
-WITH unique_trades AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t.*
-  FROM "Trades" t
-  WHERE t."TradeDate" BETWEEN $1 AND $2
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-)
-SELECT 
-  "TradeNum" AS "id",
-  "Operation" AS "operation",
-  "FirmId" AS "brokerCode",
-  "FirmName" AS "brokerName",
-  "CPFirmId" AS "counterparty",
-  "CPFirmName" AS "counterpartyName",
-  "ClassCode" AS "classCode",
-  "SecCode" AS "secCode",
-  "TradeDate" AS "tradeDate",
-  "SettleDate" AS "settleDate",
-  "Price" AS "price",
-  "Qty" AS "quantity",
-  "Value" AS "value"
-FROM unique_trades
-ORDER BY "ClassCode", "SecCode", "TradeDate", "TradeNum"
+SELECT
+  b."TradeNum" AS "id",
+  b."FirmId"   AS "buyerId",
+  COALESCE(NULLIF(TRIM(bf."FirmName"), ''), b."FirmName") AS "buyerName",
+  s."FirmId"   AS "sellerId",
+  COALESCE(NULLIF(TRIM(sf."FirmName"), ''), s."FirmName") AS "sellerName",
+  s."FirmId"   AS "brokerCode",
+  COALESCE(NULLIF(TRIM(sf."FirmName"), ''), s."FirmName") AS "brokerName",
+  b."FirmId"   AS "counterparty",
+  COALESCE(NULLIF(TRIM(bf."FirmName"), ''), b."FirmName") AS "counterpartyName",
+  b."ClassCode" AS "classCode",
+  COALESCE(cl."ClassName", b."ClassCode") AS "className",
+  b."SecCode" AS "secCode",
+  sec."SecFullName" AS "secFullName",
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
+  b."Price" AS "price",
+  b."Qty" AS "quantity",
+  b."Value" AS "value"
+FROM "Trades" b
+JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
+LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
+LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND $2
+ORDER BY b."ClassCode", b."SecCode", b."TradeDate", b."TradeNum"
 `.trim();
 
 /**
@@ -60,8 +66,9 @@ WITH unique_trades AS (
 SELECT
   t."TradeNum" AS "id",
   MAX(t."ClassCode") AS "classCode",
+  MAX(COALESCE(c."ClassName", t."ClassCode")) AS "className",
   MAX(t."SecCode") AS "secCode",
-  MAX(t."TradeDate") AS "tradeDate",
+  to_char(MAX(t."TradeDate"), 'YYYY-MM-DD') AS "tradeDate",
   MAX(CASE WHEN t."Operation" = 'Продажа' THEN t."Account" END) AS "sellAccount",
   MAX(CASE WHEN t."Operation" = 'Купля' THEN t."Account" END) AS "buyAccount",
   MAX(t."Qty") AS "quantity",
@@ -69,6 +76,7 @@ SELECT
   MAX(s."SecFullName") AS "secFullName"
 FROM unique_trades t
 LEFT JOIN "Securities" s ON t."SecCode" = s."SecCode"
+LEFT JOIN "Classes" c ON c."ClassCode" = t."ClassCode"
 GROUP BY t."TradeNum"
 ORDER BY t."TradeNum"
 `.trim();
@@ -99,8 +107,9 @@ WITH trade_sums AS (
 SELECT
   ROUND(t."Price", 2) AS "price",
   t."SecCode" AS "secCode",
-  MAX(t."TradeDate") AS "tradeDate",
+  to_char(MAX(t."TradeDate"), 'YYYY-MM-DD') AS "tradeDate",
   MAX(t."ClassCode") AS "classCode",
+  MAX(COALESCE(cl."ClassName", t."ClassCode")) AS "className",
   SUM(t."Qty" * COALESCE(s."FaceValue", 1)) AS "nominalSum",
   SUM(t."Qty" * t."Price") AS "valueActual",
   ROUND(AVG(t."Yield"), 2) AS "yieldPercent",
@@ -113,6 +122,7 @@ SELECT
   END AS "bidType"
 FROM trade_sums t
 LEFT JOIN "Securities" s ON s."SecCode" = t."SecCode"
+LEFT JOIN "Classes" cl ON cl."ClassCode" = t."ClassCode"
 GROUP BY t."Price", t."SecCode", 
   CASE 
     WHEN t."Price" > 0 THEN 'Конкурентная'
@@ -205,8 +215,8 @@ prev_auctions AS (
 SELECT
     cur."SecCode" AS cur_sec_code,
     prev."SecCode" AS prev_sec_code,
-    cur."TradeDate" AS current_date,
-    prev."TradeDate" AS previous_date,
+    to_char(cur."TradeDate", 'YYYY-MM-DD') AS current_date,
+    to_char(prev."TradeDate", 'YYYY-MM-DD') AS previous_date,
     cur.offer_volume AS current_offer_volume,
     prev.offer_volume AS previous_offer_volume,
     ROUND(cur.offer_volume - prev.offer_volume, 2) AS diff_offer_volume,
@@ -291,7 +301,7 @@ by_dealer AS (
 )
 SELECT
   b."SecCode" AS registration_number,
-  b."TradeDate" AS auction_date,
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS auction_date,
   a.issue_volume,
   a.non_competitive_amount,
   b.dealer_name,
@@ -320,8 +330,9 @@ WITH unique_trades AS (
 )
 SELECT
   u."SecCode"                                                                       AS sec_code,
-  u."TradeDate"                                                                     AS trade_date,
+  to_char(u."TradeDate", 'YYYY-MM-DD')                                               AS trade_date,
   MAX(u."ClassCode")                                                                AS class_code,
+  MAX(COALESCE(c."ClassName", u."ClassCode"))                                       AS class_name,
   MAX(s."SecFullName")                                                              AS sec_full_name,
   COALESCE(MAX(s."FaceValue"), 100)                                                 AS face_value,
   SUM(u."Qty")                                                                      AS issue_qty,
@@ -337,6 +348,7 @@ SELECT
   0                                                                                 AS non_resident_count
 FROM unique_trades u
 LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
+LEFT JOIN "Classes" c ON c."ClassCode" = u."ClassCode"
 GROUP BY u."SecCode", u."TradeDate"
 ORDER BY u."TradeDate", u."SecCode"
 `.trim();
@@ -381,7 +393,7 @@ by_dealer AS (
 )
 SELECT
   b."SecCode" AS registration_number,
-  b."TradeDate" AS auction_date,
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS auction_date,
   a.issue_volume,
   a.non_competitive_amount,
   b.dealer_name,
@@ -395,32 +407,38 @@ ORDER BY b."SecCode", b."TradeDate", b.actual_value DESC
 `.trim();
 
 /**
- * SQL для Биржевого контракта (один документ на сделку)
+ * SQL для Биржевого контракта (один документ на сделку).
+ * Продавец/покупатель через JOIN по Operation.
  */
 const exchangeContractQuery = `
-WITH unique_trades AS (
-  SELECT t.*
-  FROM "Trades" t
-  WHERE t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-)
 SELECT
-  t."TradeNum" AS "id",
-  MAX(t."TradeDate") AS "tradeDate",
-  MAX(t."ClassCode") AS "classCode",
-  MAX(t."SecCode") AS "secCode",
-  MAX(CASE WHEN t."Operation" = 'Продажа' THEN NULLIF(TRIM(t."FirmName"), '') END) AS "sellerName",
-  MAX(CASE WHEN t."Operation" = 'Продажа' THEN t."Account" END) AS "sellAccount",
-  MAX(CASE WHEN t."Operation" = 'Купля' THEN NULLIF(TRIM(t."FirmName"), '') END) AS "buyerName",
-  MAX(CASE WHEN t."Operation" = 'Купля' THEN t."Account" END) AS "buyAccount",
-  MAX(t."Qty") AS "quantity",
-  MAX(t."Price") AS "price",
-  MAX(t."Value") AS "value",
-  MAX(t."SettleDate") AS "settleDate",
+  b."TradeNum" AS "id",
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  to_char(b."TradeDateTime", 'HH24:MI:SS') AS "tradeDateTime",
+  b."ClassCode" AS "classCode",
+  COALESCE(cl."ClassName", b."ClassCode") AS "className",
+  b."SecCode" AS "secCode",
+  sec."SecFullName" AS "secFullName",
+  COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS "sellerName",
+  s."Account" AS "sellAccount",
+  NULLIF(TRIM(s."ClientCode"), '') AS "sellerClientCode",
+  COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS "buyerName",
+  b."Account" AS "buyAccount",
+  NULLIF(TRIM(b."ClientCode"), '') AS "buyerClientCode",
+  b."Qty" AS "quantity",
+  b."Price" AS "price",
+  b."Value" AS "value",
+  to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   NULL::numeric AS "couponRate"
-FROM unique_trades t
-GROUP BY t."TradeNum"
-ORDER BY t."TradeNum"
+FROM "Trades" b
+JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
+LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
+LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+ORDER BY b."TradeNum"
 `.trim();
 
 /**

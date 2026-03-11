@@ -98,7 +98,7 @@ export function AuctionSummaryReport({ data }: { data: AuctionSummaryData }) {
             </tr>
             <tr>
               <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Вид ГЦБ</td>
-              <td className="border border-border px-3 py-2">{data.classCode}</td>
+              <td className="border border-border px-3 py-2">{data.className ?? data.classCode}</td>
             </tr>
             <tr>
               <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Срок обращения ГЦБ</td>

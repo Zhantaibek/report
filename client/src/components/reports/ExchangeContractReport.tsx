@@ -2,16 +2,22 @@
  * Биржевой контракт — без рамок таблицы, метка+значение (жирный), блоки через пустую строку.
  */
 import React from 'react';
+import { KSELogoHeader } from './KSELogoHeader';
 
 export interface ExchangeContractData {
   id: string | number;
   tradeDate: string;
+  tradeDateTime?: string | null;
   classCode?: string;
+  className?: string;
   secCode?: string;
+  secFullName?: string;
   sellerName?: string | null;
   sellAccount?: string | null;
+  sellerClientCode?: string | null;
   buyerName?: string | null;
   buyAccount?: string | null;
+  buyerClientCode?: string | null;
   quantity: number;
   price: number;
   value: number;
@@ -67,29 +73,18 @@ function Gap() {
 }
 
 const LEGAL_TEXT =
-  'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи ценных бумаг в ходе биржевых торгов, организация ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки купли-продажи и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
+  'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи ценных бумаг в ходе биржевых торгов, организованных ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки купли-продажи и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
 
 function OneContract({ data }: { data: ExchangeContractData }) {
   const tradeDate = data.tradeDate ?? '';
-  const tradeTime = tradeDate ? fmtTime(tradeDate) : '—';
+  const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
   const couponVal = data.couponRate != null && data.couponRate > 0
     ? fmtNum(data.couponRate, 2)
     : '—';
 
   return (
     <div className="w-full bg-white text-sm leading-normal">
-      {/* Шапка */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-start gap-3">
-          <img src="/favicon.png" alt="KSE" className="h-12 w-12 shrink-0 object-contain" />
-          <div className="leading-tight">
-            <p className="font-semibold">Кыргызская Фондовая Биржа</p>
-            <p className="text-muted-foreground">Кыргыз Фондулук Биржасы</p>
-            <p className="text-muted-foreground">Kyrgyz Stock Exchange</p>
-          </div>
-        </div>
-        <p className="text-muted-foreground text-sm">г. Бишкек</p>
-      </div>
+      <KSELogoHeader />
 
       <h1 className="text-lg font-bold mb-4 text-center">Биржевой контракт №{data.id ?? '—'}</h1>
 
@@ -106,20 +101,20 @@ function OneContract({ data }: { data: ExchangeContractData }) {
       {/* Блок 2: Продавец */}
       <Row label="Участник торгов (Продавец / представитель Продавца)" value={data.sellerName || '—'} />
       <Row label="Счет списания ценных бумаг" value={data.sellAccount || '—'} />
-      <Row label="Трейдер Участника торгов" value="—" />
+      <Row label="Трейдер Участника торгов" value={data.sellerClientCode || '—'} />
 
       <Gap />
 
       {/* Блок 3: Покупатель */}
       <Row label="Участник торгов (Покупатель / представитель Покупателя)" value={data.buyerName || '—'} />
-      <Row label="Счет списания ценных бумаг" value={data.buyAccount || '—'} />
-      <Row label="Трейдер Участника торгов" value="—" />
+      <Row label="Счет зачисления ценных бумаг" value={data.buyAccount || '—'} />
+      <Row label="Трейдер Участника торгов" value={data.buyerClientCode || '—'} />
 
       <Gap />
 
       {/* Блок 4: ЦБ */}
-      <Row label="Вид ЦБ, эмитент ЦБ" value={data.classCode || '—'} />
-      <Row label="Торговый символ ценной бумаги" value={data.secCode || '—'} />
+      <Row label="Вид ЦБ, эмитент ЦБ" value={data.className || data.classCode || '—'} />
+      <Row label="Торговый символ ценной бумаги" value={data.secFullName || data.secCode || '—'} />
       <Row label="Ставка купона" value={couponVal} />
 
       <Gap />
@@ -127,20 +122,20 @@ function OneContract({ data }: { data: ExchangeContractData }) {
       {/* Блок 5: сделка (3 двойных строки) */}
       <Row2
         label1="Количество ЦБ"
-        value1={`${fmtNum(data.quantity)} шт.`}
+        value1={`${fmtNum(data.quantity, 2)} шт.`}
         label2="Дата исполнения сделки"
         value2={fmtDate(data.settleDate)}
       />
       <Row2
         label1="Цена за 1 ЦБ"
-        value1={`${fmtNum(data.price)} с.`}
-        label2="Комиссионный сбор Продавца"
+        value1={`${fmtNum(data.price, 2)} с.`}
+        label2="Комиссионный сбор с Продавца"
         value2="—"
       />
       <Row2
         label1="Сумма сделки"
-        value1={`${fmtNum(data.value)} с.`}
-        label2="Комиссионный сбор Покупателя"
+        value1={`${fmtNum(data.value, 2)} с.`}
+        label2="Комиссионный сбор с Покупателя"
         value2="—"
       />
 
@@ -159,7 +154,7 @@ function OneContract({ data }: { data: ExchangeContractData }) {
       </div>
 
       {/* Юридический текст — по центру */}
-      <p className="text-center text-sm leading-relaxed text-foreground">
+      <p className="text-center text-sm leading-relaxed text-foreground font-bold">
         {LEGAL_TEXT}
       </p>
 

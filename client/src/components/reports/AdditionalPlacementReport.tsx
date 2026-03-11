@@ -8,6 +8,7 @@ export interface AdditionalPlacementData {
   sec_code: string;
   trade_date: string;
   class_code: string;
+  class_name?: string;
   sec_full_name: string;
   face_value: number;
   issue_qty: number;
@@ -74,7 +75,7 @@ export function AdditionalPlacementReport({
             </tr>
             <tr>
               <td className="border border-border px-3 py-2">Вид ГЦБ</td>
-              <td className="border border-border px-3 py-2">{data.class_code || '—'}</td>
+              <td className="border border-border px-3 py-2">{data.class_name || data.class_code || '—'}</td>
             </tr>
             <tr>
               <td className="border border-border px-3 py-2">Срок обращение ГЦБ</td>

@@ -19,11 +19,13 @@ export interface TradeRow {
 
 export interface SecurityGroup {
   securityId: string;
+  secFullName?: string;
   trades: TradeRow[];
 }
 
 export interface ClassGroup {
   classId: string;
+  className?: string;
   securities: SecurityGroup[];
 }
 
@@ -109,7 +111,7 @@ export default function Form1Report({ data, className, showTotalSummary = true }
 
       {/* Таблица */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-sm table-fixed">
           <thead>
             <tr className="bg-muted/60">
               <th className="border border-border px-3 py-2 text-center font-medium">
@@ -121,10 +123,10 @@ export default function Form1Report({ data, className, showTotalSummary = true }
               <th className="border border-border px-3 py-2 text-center font-medium">
                 Дата исполнения
               </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
+              <th className="border border-border px-3 py-2 text-center font-medium w-[18%]">
                 Продавец
               </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
+              <th className="border border-border px-3 py-2 text-center font-medium w-[18%]">
                 Покупатель
               </th>
               <th className="border border-border px-3 py-2 text-right font-medium">
@@ -150,7 +152,7 @@ export default function Form1Report({ data, className, showTotalSummary = true }
                       colSpan={8}
                       className="border border-border px-3 py-1.5 font-medium"
                     >
-                      Класс: {cls.classId}
+                      Класс: {cls.className ?? cls.classId}
                     </td>
                   </tr>
                   {cls.securities.map((sec) => {
@@ -166,7 +168,7 @@ export default function Form1Report({ data, className, showTotalSummary = true }
                             colSpan={8}
                             className="border border-border px-3 py-1.5 font-medium"
                           >
-                            Ценная бумага: {sec.securityId}
+                            Ценная бумага: {sec.secFullName ?? sec.securityId}
                           </td>
                         </tr>
                         {/* Строки сделок */}
@@ -181,10 +183,10 @@ export default function Form1Report({ data, className, showTotalSummary = true }
                             <td className="border border-border px-3 py-2">
                               {row.dateExecution}
                             </td>
-                            <td className="border border-border px-3 py-2">
+                            <td className="border border-border px-3 py-2 break-words align-top">
                               {row.seller}
                             </td>
-                            <td className="border border-border px-3 py-2">
+                            <td className="border border-border px-3 py-2 break-words align-top">
                               {row.buyer}
                             </td>
                             <td className="border border-border px-3 py-2 text-right tabular-nums">
