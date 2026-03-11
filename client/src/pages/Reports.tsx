@@ -29,9 +29,20 @@ import { CentralDepositoryReport, type CentralDepositoryData } from '../componen
 import { AdditionalPlacementReport, type AdditionalPlacementData } from '../components/reports/AdditionalPlacementReport.tsx';
 import { ExchangeContractReport, type ExchangeContractData } from '../components/reports/ExchangeContractReport.tsx';
 import { ExchangeCertificateReport, type ExchangeCertificateData } from '../components/reports/ExchangeCertificateReport.tsx';
+import { Form5Report, type ReportForm5Data, type Form5Row } from '../components/reports/Form5Report.tsx';
+import { Form6Report, type ReportForm6Data, type Form6Row } from '../components/reports/Form6Report.tsx';
+import { Form8Report, type ReportForm8Data, type Form8Row } from '../components/reports/Form8Report.tsx';
+import { Form7Report, type ReportForm7Data, type Form7Row } from '../components/reports/Form7Report.tsx';
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 import { DateInput } from '../components/ui/date-input.tsx';
+
+/** Формы с кастомным отображением (не таблица по умолчанию); для них доступна печать. */
+const FORMS_WITH_CUSTOM_VIEW = new Set([
+  'Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3', 'Blank_Form_5', 'Blank_Form_6', 'Blank_Form_6A', 'Blank_Form_7', 'Blank_Form_8', 'Blank_Form_9', 'Blank_Form_USD',
+  'Auction_Summary', 'Auction_Summary_2', 'Auction_Bid_Classification', 'Auction_Central_Depository', 'Auction_Additional_Placement',
+  'Exchange_Contract', 'Exchange_Certificate',
+]);
 
 export default function Reports() {
   const [forms, setForms] = useState<ReportForm[]>([]);
@@ -430,7 +441,7 @@ export default function Reports() {
                     </>
                   )}
                 </Button>
-                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows && usdRows.length > 0 && selectedForm?.code === 'Blank_Form_USD') || (result && (selectedForm?.code === 'Blank_Form_2' || selectedForm?.code === 'Blank_Form_3' || selectedForm?.code === 'Blank_Form_6A' || selectedForm?.code === 'Blank_Form_9' || selectedForm?.code === 'Auction_Summary' || selectedForm?.code === 'Auction_Summary_2' || selectedForm?.code === 'Auction_Bid_Classification' || selectedForm?.code === 'Auction_Central_Depository' || selectedForm?.code === 'Auction_Additional_Placement' || selectedForm?.code === 'Exchange_Contract' || selectedForm?.code === 'Exchange_Certificate'))) && (
+                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows?.length && selectedForm?.code === 'Blank_Form_USD') || (result && selectedForm?.code && FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code))) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
                     Печать
@@ -591,6 +602,123 @@ export default function Reports() {
                       <Form6AReport data={form6AData} />
                     </div>
                   </>
+                );
+              })()}
+
+              {/* Форма 6 — ведомость заключенных сделок с отдельной колонкой листинга */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_6' || result.rows.length === 0) {
+                  return null;
+                }
+                const start = (page - 1) * limit;
+                const end = start + limit;
+                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
+                const totalPages = Math.ceil(result.total / limit);
+                const showFullTotals = isPrinting || page === totalPages;
+                const fullTotals = showFullTotals
+                  ? (() => {
+                      let totalQuantity = 0;
+                      let totalVolume = 0;
+                      for (const row of result.rows as Record<string, unknown>[]) {
+                        totalQuantity += Number(row.quantity ?? 0);
+                        totalVolume += Number(row.value ?? 0);
+                      }
+                      return { totalQuantity, totalVolume, dealCount: result.rows.length };
+                    })()
+                  : undefined;
+
+                const form6Data = buildForm6Data(
+                  pagedRows as Record<string, unknown>[],
+                  filters.dateFrom || '',
+                  filters.dateTo || '',
+                  fullTotals,
+                );
+                return (
+                  <div className="mt-6" key={`form6-page-${page}`}>
+                    <Form6Report data={form6Data} />
+                  </div>
+                );
+              })()}
+
+              {/* Форма 8 — Отчет о заключенных сделках (компания, символ, ISIN) */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_8' || result.rows.length === 0) {
+                  return null;
+                }
+                const start = (page - 1) * limit;
+                const end = start + limit;
+                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
+                const totalPages = Math.ceil(result.total / limit);
+                const showFullTotals = isPrinting || page === totalPages;
+                const fullTotals = showFullTotals
+                  ? (() => {
+                      let totalQuantity = 0;
+                      let totalVolume = 0;
+                      for (const row of result.rows as Record<string, unknown>[]) {
+                        totalQuantity += Number(row.quantity ?? 0);
+                        totalVolume += Number(row.value ?? 0);
+                      }
+                      return { totalQuantity, totalVolume, dealCount: result.rows.length };
+                    })()
+                  : undefined;
+
+                const form8Data = buildForm8Data(
+                  pagedRows as Record<string, unknown>[],
+                  filters.dateFrom || '',
+                  filters.dateTo || '',
+                  fullTotals,
+                );
+                return (
+                  <div className="mt-6" key={`form8-page-${page}`}>
+                    <Form8Report data={form8Data} />
+                  </div>
+                );
+              })()}
+
+              {/* Форма 5 — ведомость заключенных сделок */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_5' || result.rows.length === 0) {
+                  return null;
+                }
+                const start = (page - 1) * limit;
+                const end = start + limit;
+                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
+                const totalPages = Math.ceil(result.total / limit);
+                const showFullTotals = isPrinting || page === totalPages;
+                const fullTotals = showFullTotals
+                  ? (() => {
+                      let totalQuantity = 0;
+                      let totalVolume = 0;
+                      for (const row of result.rows as Record<string, unknown>[]) {
+                        totalQuantity += Number(row.quantity ?? 0);
+                        totalVolume += Number(row.value ?? 0);
+                      }
+                      return { totalQuantity, totalVolume, dealCount: result.rows.length };
+                    })()
+                  : undefined;
+                const form5Data = buildForm5Data(
+                  pagedRows as Record<string, unknown>[],
+                  filters.dateFrom || '',
+                  filters.dateTo || '',
+                  fullTotals,
+                );
+                return (
+                  <div className="mt-6" key={`form5-page-${page}`}>
+                    <Form5Report data={form5Data} />
+                  </div>
+                );
+              })()}
+
+              {/* Форма F7 — по секторам и ЦБ */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_7' || result.rows.length === 0) {
+                  return null;
+                }
+                const form7Data = buildForm7Data(result.rows as Record<string, unknown>[], filters.dateFrom || '', filters.dateTo || '');
+                return (
+                  <div className="mt-6">
+                    <Form7Report data={form7Data} />
+                  </div>
                 );
               })()}
 
@@ -1007,7 +1135,7 @@ export default function Reports() {
               )}
 
               {/* Остальные формы — обычные таблицы */}
-              {result?.type === 'table' && !['Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3', 'Blank_Form_6A', 'Blank_Form_9', 'Blank_Form_USD', 'Auction_Summary', 'Auction_Summary_2', 'Auction_Bid_Classification', 'Auction_Central_Depository', 'Auction_Additional_Placement', 'Exchange_Contract', 'Exchange_Certificate'].includes(selectedForm.code) && (() => {
+              {result?.type === 'table' && selectedForm?.code && !FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code) && (() => {
                 const start = (page - 1) * limit;
                 const end = start + limit;
                 const pagedRows = result.rows.slice(start, end);
@@ -1369,6 +1497,228 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
   }
 
   return classes;
+}
+
+function volumeTypeLabelForm5(className: string): string {
+  const c = (className || '').toLowerCase();
+  if (c.includes('гцб') || c.includes('гко') || c.includes('государственн')) return 'ГЦБ';
+  if (c.includes('облигац')) return 'Листинговые облигации';
+  if (c.includes('нелистинг') || c.includes('не листинг')) return 'Нелистинговые акции';
+  if (c.includes('акци')) return 'Листинговые акции';
+  return 'Листинговые акции';
+}
+
+function buildForm5Data(
+  rows: Record<string, unknown>[],
+  periodFrom: string,
+  periodTo: string,
+  totalsOverride?: { totalQuantity: number; totalVolume: number; dealCount: number },
+): ReportForm5Data {
+  const form5Rows: Form5Row[] = [];
+  let totalQuantity = 0;
+  let totalVolume = 0;
+
+  for (const r of rows) {
+    const className = String(r.className ?? '');
+    const quantity = Number(r.quantity ?? 0);
+    const value = Number(r.value ?? 0);
+    totalQuantity += quantity;
+    totalVolume += value;
+    form5Rows.push({
+      tradeDate: String(r.tradeDate ?? '').slice(0, 10),
+      secFullName: String(r.secFullName ?? ''),
+      secCode: String(r.secCode ?? ''),
+      id: String(r.id ?? ''),
+      buyerName: String(r.buyerName ?? ''),
+      sellerName: String(r.sellerName ?? ''),
+      quantity,
+      price: Number(r.price ?? 0),
+      value,
+      volumeType: volumeTypeLabelForm5(className),
+    });
+  }
+
+  const totals = totalsOverride ?? { totalQuantity, totalVolume, dealCount: form5Rows.length };
+  return {
+    periodFrom,
+    periodTo,
+    rows: form5Rows,
+    totalQuantity: totals.totalQuantity,
+    totalVolume: totals.totalVolume,
+    dealCount: totals.dealCount,
+  };
+}
+
+function buildForm6Data(
+  rows: Record<string, unknown>[],
+  periodFrom: string,
+  periodTo: string,
+  totalsOverride?: { totalQuantity: number; totalVolume: number; dealCount: number },
+): ReportForm6Data {
+  const form6Rows: Form6Row[] = [];
+  let totalQuantity = 0;
+  let totalVolume = 0;
+
+  for (const r of rows) {
+    const className = String(r.className ?? '');
+    const quantity = Number(r.quantity ?? 0);
+    const value = Number(r.value ?? 0);
+    totalQuantity += quantity;
+    totalVolume += value;
+    const listingType = volumeTypeLabelForm5(className);
+    form6Rows.push({
+      tradeDate: String(r.tradeDate ?? '').slice(0, 10),
+      secFullName: String(r.secFullName ?? ''),
+      secCode: String(r.secCode ?? ''),
+      id: String(r.id ?? ''),
+      buyerName: String(r.buyerName ?? ''),
+      sellerName: String(r.sellerName ?? ''),
+      quantity,
+      price: Number(r.price ?? 0),
+      value,
+      volumeType: listingType,
+      listingType,
+    });
+  }
+
+  const totals = totalsOverride ?? { totalQuantity, totalVolume, dealCount: form6Rows.length };
+  return {
+    periodFrom,
+    periodTo,
+    rows: form6Rows,
+    totalQuantity: totals.totalQuantity,
+    totalVolume: totals.totalVolume,
+    dealCount: totals.dealCount,
+  };
+}
+
+function buildForm8Data(
+  rows: Record<string, unknown>[],
+  periodFrom: string,
+  periodTo: string,
+  totalsOverride?: { totalQuantity: number; totalVolume: number; dealCount: number },
+): ReportForm8Data {
+  const form8Rows: Form8Row[] = [];
+  let totalQuantity = 0;
+  let totalVolume = 0;
+
+  for (const r of rows) {
+    const quantity = Number(r.quantity ?? 0);
+    const value = Number(r.value ?? 0);
+    totalQuantity += quantity;
+    totalVolume += value;
+    form8Rows.push({
+      tradeDate: String(r.tradeDate ?? '').slice(0, 10),
+      companyName: String((r as any).companyName ?? r.secFullName ?? ''),
+      symbol: String((r as any).symbol ?? r.secCode ?? ''),
+      isin: String((r as any).isin ?? ''),
+      price: Number(r.price ?? 0),
+      quantity,
+      value,
+    });
+  }
+
+  const totals = totalsOverride ?? { totalQuantity, totalVolume, dealCount: form8Rows.length };
+  return {
+    periodFrom,
+    periodTo,
+    rows: form8Rows,
+    totalQuantity: totals.totalQuantity,
+    totalVolume: totals.totalVolume,
+    dealCount: totals.dealCount,
+  };
+}
+
+function buildForm7Data(rows: Record<string, unknown>[], periodFrom: string, periodTo: string): ReportForm7Data {
+  const sectorMap = new Map<string, Map<string, Form7Row[]>>();
+  let grandDealCount = 0;
+  let grandQuantity = 0;
+  let grandVolume = 0;
+
+  for (const r of rows) {
+    const sector = String(r.sector ?? r.className ?? '');
+    const secCode = String(r.secCode ?? '');
+    const secFullName = String(r.secFullName ?? secCode);
+    const tradeDate = String(r.tradeDate ?? '').slice(0, 10);
+    const dealCount = Number(r.dealCount ?? 0);
+    const quantity = Number(r.quantity ?? 0);
+    const maxPrice = Number(r.maxPrice ?? 0);
+    const minPrice = Number(r.minPrice ?? 0);
+    const avgPrice = Number(r.avgPrice ?? 0);
+    const volume = Number(r.volume ?? 0);
+
+    if (!sectorMap.has(sector)) sectorMap.set(sector, new Map());
+    const secMap = sectorMap.get(sector)!;
+    if (!secMap.has(secCode)) secMap.set(secCode, []);
+    secMap.get(secCode)!.push({
+      sector,
+      secCode,
+      secFullName,
+      tradeDate,
+      dealCount,
+      quantity,
+      maxPrice,
+      minPrice,
+      avgPrice,
+      volume,
+    });
+    grandDealCount += dealCount;
+    grandQuantity += quantity;
+    grandVolume += volume;
+  }
+
+  const sectors: ReportForm7Data['sectors'] = [];
+  for (const [sectorName, secMap] of sectorMap.entries()) {
+    const securities: ReportForm7Data['sectors'][0]['securities'] = [];
+    let sectorDealCount = 0;
+    let sectorQuantity = 0;
+    let sectorVolume = 0;
+
+    for (const [secCode, dateRows] of secMap.entries()) {
+      const secFullName = dateRows[0]?.secFullName ?? secCode;
+      const totalDealCount = dateRows.reduce((s, row) => s + row.dealCount, 0);
+      const totalQuantity = dateRows.reduce((s, row) => s + row.quantity, 0);
+      const totalVolume = dateRows.reduce((s, row) => s + row.volume, 0);
+      const prices = dateRows.flatMap((row) => [row.maxPrice, row.minPrice].filter((p) => p > 0));
+      const maxPrice = prices.length ? Math.max(...prices) : 0;
+      const minPrice = prices.length ? Math.min(...prices.filter((p) => p > 0)) : 0;
+      const avgPrice = totalQuantity > 0 ? dateRows.reduce((s, row) => s + row.avgPrice * row.quantity, 0) / totalQuantity : 0;
+
+      securities.push({
+        secCode,
+        secFullName,
+        rows: dateRows.sort((a, b) => a.tradeDate.localeCompare(b.tradeDate)),
+        totalDealCount,
+        totalQuantity,
+        totalVolume,
+        maxPrice,
+        minPrice,
+        avgPrice,
+      });
+      sectorDealCount += totalDealCount;
+      sectorQuantity += totalQuantity;
+      sectorVolume += totalVolume;
+    }
+
+    sectors.push({
+      sector: sectorName,
+      securities,
+      totalDealCount: sectorDealCount,
+      totalQuantity: sectorQuantity,
+      totalVolume: sectorVolume,
+    });
+  }
+
+  sectors.sort((a, b) => a.sector.localeCompare(b.sector));
+
+  return {
+    periodFrom,
+    periodTo,
+    sectors,
+    grandTotalDealCount: grandDealCount,
+    grandTotalQuantity: grandQuantity,
+    grandTotalVolume: grandVolume,
+  };
 }
 
 // Группировка данных для Blank_Form_9 (Ведомость заключенных сделок)

@@ -442,6 +442,64 @@ ORDER BY b."TradeNum"
 `.trim();
 
 /**
+ * Форма 5 — ведомость сделок: Дата, Эмитент, Гос. рег. номер ЦБ, № сделки, Покупатель, Продавец, Кол-во ЦБ, Цена, Объем.
+ * Использует базовый запрос по сделкам (одна строка на сделку).
+ */
+const form5Query = baseTradesQuery;
+
+/**
+ * Форма 6 — аналог формы 5, но с отдельной колонкой «Листинг / Непистинг».
+ * По данным использует тот же базовый запрос.
+ */
+const form6Query = baseTradesQuery;
+
+/**
+ * Форма 8 — Отчет о заключенных сделках (упрощённый вид: компания, торговый символ, цена, кол-во, сумма).
+ * Использует одну строку на сделку без агрегирования.
+ */
+const form8Query = `
+SELECT
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  sec."SecFullName" AS "companyName",
+  b."SecCode" AS "symbol",
+  NULL::text AS "isin",
+  b."Price" AS "price",
+  b."Qty" AS "quantity",
+  b."Value" AS "value"
+FROM "Trades" b
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+ORDER BY b."TradeDate", sec."SecFullName", b."SecCode", b."TradeNum"
+`.trim();
+
+/**
+ * SQL для формы F7 — отчёт по сделкам: Сектор → Ценная бумага → Дата.
+ * Агрегация: кол-во сделок, кол-во ЦБ, max/min/средняя цена, объём.
+ */
+const form7Query = `
+SELECT
+  b."ClassCode" AS "classCode",
+  COALESCE(cl."ClassName", b."ClassCode") AS "sector",
+  b."SecCode" AS "secCode",
+  sec."SecFullName" AS "secFullName",
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  COUNT(DISTINCT b."TradeNum") AS "dealCount",
+  SUM(b."Qty") AS "quantity",
+  MAX(b."Price") AS "maxPrice",
+  MIN(b."Price") AS "minPrice",
+  ROUND(SUM(b."Price" * b."Qty") / NULLIF(SUM(b."Qty"), 0), 2) AS "avgPrice",
+  SUM(b."Value") AS "volume"
+FROM "Trades" b
+LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+GROUP BY b."ClassCode", COALESCE(cl."ClassName", b."ClassCode"), b."SecCode", sec."SecFullName", b."TradeDate"
+ORDER BY COALESCE(cl."ClassName", b."ClassCode"), sec."SecFullName", b."TradeDate"
+`.trim();
+
+/**
  * Все формы отчетов определены здесь
  */
 export const reportDefinitions: ReportDefinition[] = [
@@ -470,12 +528,46 @@ export const reportDefinitions: ReportDefinition[] = [
     sql: baseTradesQuery,
   },
   {
+    code: 'Blank_Form_5',
+    name: 'Blank_Form_5',
+    description: 'Форма 5 - Отчет о заключенных сделках',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: form5Query,
+  },
+  {
+    code: 'Blank_Form_6',
+    name: 'Blank_Form_6',
+    description: 'Форма 6 - Отчет о заключенных сделках',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: form6Query,
+  },
+  {
+    code: 'Blank_Form_8',
+    name: 'Blank_Form_8',
+    description: 'Форма 8 - Отчет о заключенных сделках',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    // Используем базовый запрос по сделкам, а представление (компания, символ, ISIN, цена, кол-во, сумма)
+    // формируется на фронтенде в buildForm8Data / Form8Report.
+    sql: baseTradesQuery,
+  },
+  {
     code: 'Blank_Form_6A',
     name: 'Blank_Form_6A',
     description: 'Форма 6А - Сводный отчет по сделкам',
     type: 'table',
     category: 'Отчеты по системной информации',
     sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_7',
+    name: 'Blank_Form_7',
+    description: 'Форма 7 - Отчёт по сделкам по секторам',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: form7Query,
   },
   {
     code: 'Blank_Form_9',

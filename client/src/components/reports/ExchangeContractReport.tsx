@@ -86,7 +86,11 @@ function OneContract({ data }: { data: ExchangeContractData }) {
     <div className="w-full bg-white text-sm leading-normal">
       <KSELogoHeader />
 
-      <h1 className="text-lg font-bold mb-4 text-center">Биржевой контракт №{data.id ?? '—'}</h1>
+      <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт №{data.id ?? '—'}</h1>
+      <p className="text-center text-sm mb-4">
+        <span className="text-foreground">Номер сделки: </span>
+        <span className="font-semibold text-foreground">{data.id ?? '—'}</span>
+      </p>
 
       {/* Блок 1: дата и время */}
       <Row2
