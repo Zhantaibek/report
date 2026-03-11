@@ -29,6 +29,7 @@ export interface AuctionSummaryData {
   auctionDate: string;
   secCode: string;
   classCode: string;
+  className?: string;
   secFullName: string;
   registrationNumber: string;
   couponRate: number;
