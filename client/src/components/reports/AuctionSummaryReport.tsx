@@ -75,7 +75,7 @@ export function AuctionSummaryReport({ data }: { data: AuctionSummaryData }) {
   const periodFrom = data.auctionDate || '';
   const periodTo = data.auctionDate || '';
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
         formNumber=""
         title="Сводная ведомость по аукциону ГЦБ"

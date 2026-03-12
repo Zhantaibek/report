@@ -17,8 +17,8 @@ export function ReportHeader({ formNumber, title, periodFrom, periodTo }: Report
   const to = toDdMmYyyy(periodTo);
   return (
     <>
-      {/* Шапка: логотип + название биржи */}
-      <div className="mb-6 flex items-start justify-between">
+      {/* Шапка: логотип + заголовок отчёта + период */}
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <img
             src="/favicon.png"
@@ -31,18 +31,20 @@ export function ReportHeader({ formNumber, title, periodFrom, periodTo }: Report
             <p className="text-muted-foreground">Kyrgyz Stock Exchange</p>
           </div>
         </div>
-        <div className="text-right">
+        <div className="flex-1 px-4 flex items-end justify-center text-center">
+          {title && (
+            <h1 className="text-base font-semibold leading-tight">
+              {title}
+            </h1>
+          )}
+        </div>
+        <div className="flex flex-col items-end justify-center text-right">
           <p className="font-medium">{formNumber}</p>
           <p className="text-muted-foreground">
             Период с: {from} по: {to}
           </p>
         </div>
       </div>
-
-      {/* Заголовок отчёта */}
-      <h1 className="mb-6 text-center text-lg font-semibold">
-        {title}
-      </h1>
     </>
   );
 }

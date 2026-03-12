@@ -36,13 +36,105 @@ import { Form7Report, type ReportForm7Data, type Form7Row } from '../components/
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 import { DateInput } from '../components/ui/date-input.tsx';
+import { Alert, AlertDescription } from '../components/ui/alert.tsx';
+
+/** Метаданные форм отчётов: конфигурация поведения на клиенте (и потенциально на сервере). */
+interface FormMeta {
+  /** Используется ли отдельный React‑шаблон вместо общей таблицы. */
+  customView?: boolean;
+}
+
+const FORM_META: Record<string, FormMeta> = {
+  // Бланки по сделкам
+  Blank_Form_1: { customView: true },
+  Blank_Form_2: { customView: true },
+  Blank_Form_3: { customView: true },
+  Blank_Form_5: { customView: true },
+  Blank_Form_6: { customView: true },
+  Blank_Form_6A: { customView: true },
+  Blank_Form_7: { customView: true },
+  Blank_Form_8: { customView: true },
+  Blank_Form_9: { customView: true },
+  Blank_Form_USD: { customView: true },
+
+  // Аукционные формы
+  Auction_Summary: { customView: true },
+  Auction_Summary_2: { customView: true },
+  Auction_Bid_Classification: { customView: true },
+  Auction_Central_Depository: { customView: true },
+  Auction_Additional_Placement: { customView: true },
+
+  // Документы по сделкам
+  Exchange_Contract: { customView: true },
+  Exchange_Certificate: { customView: true },
+};
 
 /** Формы с кастомным отображением (не таблица по умолчанию); для них доступна печать. */
-const FORMS_WITH_CUSTOM_VIEW = new Set([
-  'Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3', 'Blank_Form_5', 'Blank_Form_6', 'Blank_Form_6A', 'Blank_Form_7', 'Blank_Form_8', 'Blank_Form_9', 'Blank_Form_USD',
-  'Auction_Summary', 'Auction_Summary_2', 'Auction_Bid_Classification', 'Auction_Central_Depository', 'Auction_Additional_Placement',
-  'Exchange_Contract', 'Exchange_Certificate',
-]);
+const FORMS_WITH_CUSTOM_VIEW = new Set(
+  Object.entries(FORM_META)
+    .filter(([, meta]) => meta.customView)
+    .map(([code]) => code),
+);
+
+function paginate<T>(
+  rows: T[],
+  page: number,
+  perPage: number,
+  isPrinting: boolean,
+  total?: number,
+): { pagedRows: T[]; totalPages: number } {
+  if (rows.length === 0) {
+    return { pagedRows: [], totalPages: 0 };
+  }
+  const effectiveTotal = total ?? rows.length;
+  if (isPrinting) {
+    return {
+      pagedRows: rows,
+      totalPages: Math.ceil(effectiveTotal / perPage),
+    };
+  }
+  const start = (page - 1) * perPage;
+  const end = start + perPage;
+  return {
+    pagedRows: rows.slice(start, end),
+    totalPages: Math.ceil(effectiveTotal / perPage),
+  };
+}
+
+function calcTotalsQuantityAndAmount(rows: Record<string, unknown>[]): { totalQuantity: number; totalAmount: number } {
+  let totalQuantity = 0;
+  let totalAmount = 0;
+  for (const row of rows) {
+    totalQuantity += Number(row.quantity ?? 0);
+    totalAmount += Number(row.value ?? 0);
+  }
+  return { totalQuantity, totalAmount };
+}
+
+function calcTotalsWithUnique(
+  rows: Record<string, unknown>[],
+): { totalQuantity: number; totalAmount: number; totalTrades: number; totalSecurities: number } {
+  let totalQuantity = 0;
+  let totalAmount = 0;
+  const uniqueSecurities = new Set<string>();
+  const uniqueTrades = new Set<string>();
+
+  for (const row of rows) {
+    totalQuantity += Number(row.quantity ?? 0);
+    totalAmount += Number(row.value ?? 0);
+    const secCode = String(row.secCode ?? '');
+    const tradeId = String(row.id ?? '');
+    if (secCode) uniqueSecurities.add(secCode);
+    if (tradeId) uniqueTrades.add(tradeId);
+  }
+
+  return {
+    totalQuantity,
+    totalAmount,
+    totalTrades: uniqueTrades.size,
+    totalSecurities: uniqueSecurities.size,
+  };
+}
 
 export default function Reports() {
   const [forms, setForms] = useState<ReportForm[]>([]);
@@ -60,6 +152,7 @@ export default function Reports() {
   const [loadingInstruments, setLoadingInstruments] = useState(false);
   const [selectedOwnId, setSelectedOwnId] = useState<number | undefined>(undefined);
   const [runError, setRunError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -75,11 +168,12 @@ export default function Reports() {
   const run = async () => {
     if (!selectedFormId) return;
     if (!filters.dateFrom || !filters.dateTo) {
-      alert('Укажите период (дата с и дата по)');
+      setValidationError('Укажите период (дата с и дата по)');
       return;
     }
     setLoading(true);
     setRunError(null);
+    setValidationError(null);
     setPage(1);
     setUsdRows(null);
     try {
@@ -144,30 +238,20 @@ export default function Reports() {
       return null;
     }
     
-    // Подсчет итогов по ВСЕМ данным (не только текущей страницы)
-    let totalQuantity = 0;
-    let totalAmount = 0;
-    const uniqueSecurities = new Set<string>();
-    const uniqueTrades = new Set<string>();
-    
-    result.rows.forEach((row: Record<string, unknown>) => {
-      totalQuantity += Number(row.quantity ?? 0);
-      totalAmount += Number(row.value ?? 0);
-      const secCode = String(row.secCode ?? '');
-      const tradeId = String(row.id ?? '');
-      if (secCode) {
-        uniqueSecurities.add(secCode);
-      }
-      if (tradeId) {
-        uniqueTrades.add(tradeId);
-      }
-    });
-    
-    // Пагинация на уровне сделок (или все данные для печати)
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-    const totalPages = Math.ceil(result.total / limit);
+    const {
+      totalQuantity,
+      totalAmount,
+      totalTrades,
+      totalSecurities,
+    } = calcTotalsWithUnique(result.rows as Record<string, unknown>[]);
+
+    const { pagedRows, totalPages } = paginate(
+      result.rows as Record<string, unknown>[],
+      page,
+      limit,
+      isPrinting,
+      result.total,
+    );
     
     const grouped = groupByClassAndSec(pagedRows);
     return {
@@ -178,8 +262,8 @@ export default function Reports() {
         totalSummary: {
           totalQuantity,
           totalAmount,
-          totalTrades: uniqueTrades.size,
-          totalSecurities: uniqueSecurities.size,
+          totalTrades,
+          totalSecurities,
         },
       },
       total: result.total,
@@ -264,6 +348,7 @@ export default function Reports() {
                     setPage(1);
                     setUsdRows(null);
                     setSelectedOwnId(undefined);
+                    setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
                     if (form?.code === 'Blank_Form_USD' && oracleInstruments.length === 0) {
                       setLoadingInstruments(true);
@@ -460,9 +545,18 @@ export default function Reports() {
               />
             )}
           </div>
+          {validationError && (
+            <div className="mt-4">
+              <Alert variant="warning">
+                <AlertDescription>{validationError}</AlertDescription>
+              </Alert>
+            </div>
+          )}
           {runError && (
-            <div className="mt-4 rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
-              {runError}
+            <div className="mt-4">
+              <Alert variant="destructive">
+                <AlertDescription>{runError}</AlertDescription>
+              </Alert>
             </div>
           )}
           {!selectedFormId && (
@@ -493,18 +587,18 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_2' || result.rows.length === 0) {
                   return null;
                 }
-                
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
-                
-                let totalQuantity = 0;
-                let totalAmount = 0;
-                result.rows.forEach((row: Record<string, unknown>) => {
-                  totalQuantity += Number(row.quantity ?? 0);
-                  totalAmount += Number(row.value ?? 0);
-                });
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
+                const { totalQuantity, totalAmount } = calcTotalsQuantityAndAmount(
+                  result.rows as Record<string, unknown>[],
+                );
                 
                 const groupedForm2 = groupByClassAndSecForm2(pagedRows);
                 const form2Data: ReportTradesForm2Data = {
@@ -534,24 +628,21 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_3' || result.rows.length === 0) {
                   return null;
                 }
-                
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
-                
-                let totalQuantity = 0;
-                let totalAmount = 0;
-                const uniqueSecurities = new Set<string>();
-                const uniqueTrades = new Set<string>();
-                result.rows.forEach((row: Record<string, unknown>) => {
-                  totalQuantity += Number(row.quantity ?? 0);
-                  totalAmount += Number(row.value ?? 0);
-                  const secCode = String(row.secCode ?? '');
-                  const tradeId = String(row.id ?? '');
-                  if (secCode) uniqueSecurities.add(secCode);
-                  if (tradeId) uniqueTrades.add(tradeId);
-                });
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
+                const {
+                  totalQuantity,
+                  totalAmount,
+                  totalTrades,
+                  totalSecurities,
+                } = calcTotalsWithUnique(result.rows as Record<string, unknown>[]);
                 
                 const groupedForm3 = groupByParticipantAndClassAndSec(pagedRows);
                 const form3Data: ReportTradesForm3Data = {
@@ -561,8 +652,8 @@ export default function Reports() {
                   totalSummary: {
                     totalQuantity,
                     totalAmount,
-                    totalTrades: uniqueTrades.size,
-                    totalSecurities: uniqueSecurities.size,
+                    totalTrades,
+                    totalSecurities,
                   },
                 };
                 
@@ -583,12 +674,15 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_6A' || result.rows.length === 0) {
                   return null;
                 }
-                
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
-                
+
+                const { pagedRows } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
                 const groupedForm6A = groupByClassSecAndDate(pagedRows);
                 const form6AData: ReportForm6AData = {
                   periodFrom: filters.dateFrom || '',
@@ -610,19 +704,21 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_6' || result.rows.length === 0) {
                   return null;
                 }
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
                 const showFullTotals = isPrinting || page === totalPages;
                 const fullTotals = showFullTotals
                   ? (() => {
-                      let totalQuantity = 0;
-                      let totalVolume = 0;
-                      for (const row of result.rows as Record<string, unknown>[]) {
-                        totalQuantity += Number(row.quantity ?? 0);
-                        totalVolume += Number(row.value ?? 0);
-                      }
+                      const { totalQuantity, totalAmount: totalVolume } = calcTotalsQuantityAndAmount(
+                        result.rows as Record<string, unknown>[],
+                      );
                       return { totalQuantity, totalVolume, dealCount: result.rows.length };
                     })()
                   : undefined;
@@ -645,19 +741,21 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_8' || result.rows.length === 0) {
                   return null;
                 }
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
                 const showFullTotals = isPrinting || page === totalPages;
                 const fullTotals = showFullTotals
                   ? (() => {
-                      let totalQuantity = 0;
-                      let totalVolume = 0;
-                      for (const row of result.rows as Record<string, unknown>[]) {
-                        totalQuantity += Number(row.quantity ?? 0);
-                        totalVolume += Number(row.value ?? 0);
-                      }
+                      const { totalQuantity, totalAmount: totalVolume } = calcTotalsQuantityAndAmount(
+                        result.rows as Record<string, unknown>[],
+                      );
                       return { totalQuantity, totalVolume, dealCount: result.rows.length };
                     })()
                   : undefined;
@@ -680,19 +778,21 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_5' || result.rows.length === 0) {
                   return null;
                 }
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
                 const showFullTotals = isPrinting || page === totalPages;
                 const fullTotals = showFullTotals
                   ? (() => {
-                      let totalQuantity = 0;
-                      let totalVolume = 0;
-                      for (const row of result.rows as Record<string, unknown>[]) {
-                        totalQuantity += Number(row.quantity ?? 0);
-                        totalVolume += Number(row.value ?? 0);
-                      }
+                      const { totalQuantity, totalAmount: totalVolume } = calcTotalsQuantityAndAmount(
+                        result.rows as Record<string, unknown>[],
+                      );
                       return { totalQuantity, totalVolume, dealCount: result.rows.length };
                     })()
                   : undefined;
@@ -727,28 +827,23 @@ export default function Reports() {
                 if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_9' || result.rows.length === 0) {
                   return null;
                 }
-                
-                const start = (page - 1) * limit;
-                const end = start + limit;
-                const pagedRows = isPrinting ? result.rows : result.rows.slice(start, end);
-                const totalPages = Math.ceil(result.total / limit);
-                
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
                 const groupedForm9 = groupByClassAndSecForm9(pagedRows);
-                
-                // Подсчет итогов по ВСЕМ данным
-                let totalQuantity = 0;
-                let totalValue = 0;
-                const uniqueSecurities = new Set<string>();
-                const uniqueTrades = new Set<string>();
-                
-                result.rows.forEach((row: Record<string, unknown>) => {
-                  totalQuantity += Number(row.quantity ?? 0);
-                  totalValue += Number(row.value ?? 0);
-                  const secCode = String(row.secCode ?? '');
-                  const tradeId = String(row.id ?? '');
-                  if (secCode) uniqueSecurities.add(secCode);
-                  if (tradeId) uniqueTrades.add(tradeId);
-                });
+
+                const {
+                  totalQuantity,
+                  totalAmount: totalValue,
+                  totalTrades,
+                  totalSecurities,
+                } = calcTotalsWithUnique(result.rows as Record<string, unknown>[]);
                 
                 const form9Data: ReportForm9Data = {
                   periodFrom: filters.dateFrom || '',
@@ -757,8 +852,8 @@ export default function Reports() {
                   totalSummary: (isPrinting || page === totalPages) ? {
                     totalQuantity,
                     totalValue,
-                    totalTrades: uniqueTrades.size,
-                    totalSecurities: uniqueSecurities.size,
+                    totalTrades,
+                    totalSecurities,
                   } : undefined,
                 };
                 
@@ -1611,7 +1706,7 @@ function buildForm8Data(
       tradeDate: String(r.tradeDate ?? '').slice(0, 10),
       companyName: String((r as any).companyName ?? r.secFullName ?? ''),
       symbol: String((r as any).symbol ?? r.secCode ?? ''),
-      isin: String((r as any).isin ?? ''),
+      isin: String(((r as any).isinCode ?? (r as any).isin) ?? ''),
       price: Number(r.price ?? 0),
       quantity,
       value,

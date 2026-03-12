@@ -69,7 +69,7 @@ interface Props {
 
 export function Form7Report({ data }: Props) {
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
         formNumber="Ф-7"
         title="Отчет о заключенных сделках"

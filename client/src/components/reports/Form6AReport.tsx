@@ -72,7 +72,7 @@ interface Props {
 
 export function Form6AReport({ data }: Props) {
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
         formNumber="Ф-6А"
         title="Сводный отчет по сделкам"
@@ -162,3 +162,4 @@ export function Form6AReport({ data }: Props) {
     </div>
   );
 }
+

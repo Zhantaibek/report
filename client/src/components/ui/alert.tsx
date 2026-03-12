@@ -3,19 +3,26 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils.ts';
 
 const alertVariants = cva(
-  'relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground',
+  'relative w-full rounded-xl border px-4 py-3 text-sm shadow-sm flex items-start gap-3',
   {
     variants: {
       variant: {
-        default: 'bg-background text-foreground',
+        default:
+          'border-border/80 bg-background text-foreground',
         destructive:
-          'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+          'border-destructive/40 bg-destructive/5 text-destructive',
+        success:
+          'border-emerald-500/40 bg-emerald-50 text-emerald-800',
+        warning:
+          'border-amber-400/60 bg-amber-50 text-amber-900',
+        info:
+          'border-sky-400/60 bg-sky-50 text-sky-900',
       },
     },
     defaultVariants: {
       variant: 'default',
     },
-  }
+  },
 );
 
 const Alert = React.forwardRef<

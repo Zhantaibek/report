@@ -55,7 +55,7 @@ function formatDate(date: string): string {
 
 export function Form9Report({ data }: { data: ReportForm9Data }) {
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader 
         formNumber="Ф-9"
         title="Ведомость заключенных сделок в торговой системе"

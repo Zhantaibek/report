@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { login } from '../api/auth.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { Alert, AlertDescription } from '../components/ui/alert.tsx';
 
 // Palette: #3d848c (dark teal), #4a9da6 (mid teal), #57b6c0 (light teal)
 
@@ -65,9 +66,9 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                {error}
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
             {/* Login field */}

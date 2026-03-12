@@ -15,8 +15,10 @@ export interface ReportDefinition {
 /**
  * Базовый SQL-запрос для получения уникальных сделок.
  * Продавец/покупатель через JOIN по Operation (Купля/Продажа).
+ *
+ * Экспортируется, т.к. используется также в dashboard‑эндпоинтах.
  */
-const baseTradesQuery = `
+export const baseTradesQuery = `
 SELECT
   b."TradeNum" AS "id",
   b."FirmId"   AS "buyerId",
@@ -31,6 +33,7 @@ SELECT
   COALESCE(cl."ClassName", b."ClassCode") AS "className",
   b."SecCode" AS "secCode",
   sec."SecFullName" AS "secFullName",
+  sec."ISINCode" AS "isinCode",
   to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   b."Price" AS "price",

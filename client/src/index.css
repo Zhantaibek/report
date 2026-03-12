@@ -38,11 +38,19 @@
 
 /* Print styles */
 @media print {
-  @page {
-    margin: 10mm;
-    size: A4 landscape;
+  html,
+  body,
+  #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
   }
-  
+
+  /* Не тянуть layout на высоту экрана при печати */
+  .min-h-screen {
+    min-height: auto !important;
+  }
+
   /* Hide header, navigation, buttons */
   header,
   nav,

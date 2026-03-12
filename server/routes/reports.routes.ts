@@ -4,9 +4,10 @@ import { runReport } from '../reports/report-engine.js';
 import { reportToXlsxBuffer } from '../reports/export/xlsx.js';
 import { reportToCsv } from '../reports/export/csv.js';
 import { getDataSources } from '../config/data-sources.js';
-import { getSecurities, getClasses, getFirms } from '../data-sources/index.js';
+import { getSecurities, getClasses, getFirms, runCustomSqlQuery } from '../data-sources/index.js';
 import { queryOracleUsd, queryOracleInstruments } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
+import { baseTradesQuery } from '../reports/report-definitions.js';
 
 const router = Router();
 
@@ -171,6 +172,109 @@ router.post('/export', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Export failed' });
+  }
+});
+
+// Для блока "Сделки за сегодня" используем тот же SQL, что и форма 1 (baseTradesQuery).
+const todayTradesQuery = baseTradesQuery;
+
+/**
+ * Сделки за сегодня для главной страницы.
+ * Использует запрос с явным JOIN покупатель/продавец.
+ */
+router.get('/today-trades', async (_req, res) => {
+  try {
+    const sources = getDataSources(true);
+    if (sources.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    let rows: Record<string, unknown>[] = [];
+
+    for (const ds of sources) {
+      const part = await runCustomSqlQuery(ds.id, todayTradesQuery, {
+        dateFrom: today,
+        dateTo: today,
+      });
+      rows = rows.concat(part);
+    }
+
+    const unique = new Map<string, Record<string, unknown>>();
+    for (const row of rows) {
+      const id = String((row as any).id ?? '');
+      if (!id) continue;
+      if (!unique.has(id)) {
+        unique.set(id, row);
+      }
+    }
+
+    res.json(Array.from(unique.values()));
+  } catch (err) {
+    console.error('[/api/reports/today-trades]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to load today trades' });
+  }
+});
+
+/**
+ * График по дневным объёмам сделок за выбранный месяц.
+ * Параметр month в формате YYYY-MM, по умолчанию — текущий месяц.
+ */
+router.get('/daily-volumes', async (req, res) => {
+  try {
+    const { month } = req.query as { month?: string };
+    const now = new Date();
+    const defaultMonth = now.toISOString().slice(0, 7);
+    const m = typeof month === 'string' && /^\d{4}-\d{2}$/.test(month) ? month : defaultMonth;
+
+    const [yearStr, monthStr] = m.split('-');
+    const year = Number(yearStr);
+    const mon = Number(monthStr); // 1-12
+    const startDate = `${m}-01`;
+    const endDateObj = new Date(Date.UTC(year, mon, 0));
+    const endDate = endDateObj.toISOString().slice(0, 10);
+
+    const sql = `
+      SELECT
+        to_char(b."TradeDate", 'YYYY-MM-DD') AS "date",
+        SUM(b."Value") AS "totalValue"
+      FROM "Trades" b
+      WHERE b."Operation" = 'Купля'
+        AND b."TradeDate" BETWEEN $1 AND $2
+      GROUP BY to_char(b."TradeDate", 'YYYY-MM-DD')
+      ORDER BY "date"
+    `.trim();
+
+    const sources = getDataSources(true);
+    if (sources.length === 0) {
+      res.json({ month: m, points: [] });
+      return;
+    }
+
+    const aggregated = new Map<string, number>();
+
+    for (const ds of sources) {
+      const part = await runCustomSqlQuery(ds.id, sql, {
+        dateFrom: startDate,
+        dateTo: endDate,
+      });
+      for (const row of part) {
+        const d = String((row as any).date ?? '');
+        const v = Number((row as any).totalValue ?? 0);
+        if (!d) continue;
+        aggregated.set(d, (aggregated.get(d) ?? 0) + v);
+      }
+    }
+
+    const points = Array.from(aggregated.entries())
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([date, totalValue]) => ({ date, totalValue }));
+
+    res.json({ month: m, points });
+  } catch (err) {
+    console.error('[/api/reports/daily-volumes]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to load daily volumes' });
   }
 });
 

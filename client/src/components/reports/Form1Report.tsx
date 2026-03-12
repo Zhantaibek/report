@@ -41,42 +41,42 @@ export interface ReportTradesConcludedData {
   };
 }
 
-const defaultMockData: ReportTradesConcludedData = {
-  periodFrom: '2025-09-01',
-  periodTo: '2026-02-13',
-  classes: [
-    {
-      classId: 'GBA02',
-      securities: [
-        {
-          securityId: 'GBA02271015',
-          trades: [
-            {
-              dealNo: '89',
-              dateConcluded: '10/15/2025',
-              dateExecution: '10/15/2025',
-              seller: 'FRDBROKER',
-              buyer: 'MBANK',
-              quantity: 10_000,
-              price: 86.3,
-              amount: 863_000,
-            },
-            {
-              dealNo: '90',
-              dateConcluded: '10/15/2025',
-              dateExecution: '10/15/2025',
-              seller: 'MBANK',
-              buyer: 'FRDBROKER',
-              quantity: 600_000,
-              price: 84.76,
-              amount: 50_856_000,
-            },
-          ],
-        },
-      ],
-    },
-  ],
-};
+// const defaultMockData: ReportTradesConcludedData = {
+//   periodFrom: '2025-09-01',
+//   periodTo: '2026-02-13',
+//   classes: [
+//     {
+//       classId: 'GBA02',
+//       securities: [
+//         {
+//           securityId: 'GBA02271015',
+//           trades: [
+//             {
+//               dealNo: '89',
+//               dateConcluded: '10/15/2025',
+//               dateExecution: '10/15/2025',
+//               seller: 'FRDBROKER',
+//               buyer: 'MBANK',
+//               quantity: 10_000,
+//               price: 86.3,
+//               amount: 863_000,
+//             },
+//             {
+//               dealNo: '90',
+//               dateConcluded: '10/15/2025',
+//               dateExecution: '10/15/2025',
+//               seller: 'MBANK',
+//               buyer: 'FRDBROKER',
+//               quantity: 600_000,
+//               price: 84.76,
+//               amount: 50_856_000,
+//             },
+//           ],
+//         },
+//       ],
+//     },
+//   ],
+// };
 
 function formatNumber(n: number): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -93,20 +93,20 @@ interface Props {
 }
 
 export default function Form1Report({ data, className, showTotalSummary = true }: Props) {
-  const report = data ?? defaultMockData;
+  if (!data) return null;
 
   return (
     <div
       className={cn(
-        'w-full bg-white pb-6 text-xs print:max-w-none print:px-0',
+        'w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0',
         className
       )}
     >
       <ReportHeader
         formNumber="Ф-1"
         title="Отчет о заключенных сделках"
-        periodFrom={report.periodFrom}
-        periodTo={report.periodTo}
+        periodFrom={data.periodFrom}
+        periodTo={data.periodTo}
       />
 
       {/* Таблица */}
@@ -141,7 +141,7 @@ export default function Form1Report({ data, className, showTotalSummary = true }
             </tr>
           </thead>
           <tbody>
-            {report.classes.map((cls) => {
+            {data.classes.map((cls) => {
               let classQuantity = 0;
               let classAmount = 0;
               return (
@@ -240,28 +240,28 @@ export default function Form1Report({ data, className, showTotalSummary = true }
             })}
             
             {/* Итого по всему отчёту (показывается только на последней странице) */}
-            {showTotalSummary && report.totalSummary && (
+            {showTotalSummary && data.totalSummary && (
               <>
                 <tr className="bg-primary/10 font-bold">
                   <td colSpan={5} className="border border-border px-3 py-2">
                     Всего:
                   </td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatInt(report.totalSummary.totalQuantity)}
+                    {formatInt(data.totalSummary.totalQuantity)}
                   </td>
                   <td className="border border-border px-3 py-2" />
                   <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(report.totalSummary.totalAmount)}
+                    {formatNumber(data.totalSummary.totalAmount)}
                   </td>
                 </tr>
                 <tr className="bg-primary/10">
                   <td colSpan={8} className="border border-border px-3 py-2">
-                    Количество финансовых инструментов: <span className="font-semibold">{report.totalSummary.totalSecurities}</span>
+                    Количество финансовых инструментов: <span className="font-semibold">{data.totalSummary.totalSecurities}</span>
                   </td>
                 </tr>
                 <tr className="bg-primary/10">
                   <td colSpan={8} className="border border-border px-3 py-2">
-                    Количество сделок: <span className="font-semibold">{report.totalSummary.totalTrades}</span>
+                    Количество сделок: <span className="font-semibold">{data.totalSummary.totalTrades}</span>
                   </td>
                 </tr>
               </>

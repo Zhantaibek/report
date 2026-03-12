@@ -51,9 +51,9 @@ interface Props {
 
 export function Form5Report({ data }: Props) {
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
-        formNumber=""
+        formNumber="Ф-5"
         title="Отчет о заключенных сделках"
         periodFrom={data.periodFrom}
         periodTo={data.periodTo}

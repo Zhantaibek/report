@@ -52,9 +52,9 @@ interface Props {
 
 export function Form6Report({ data }: Props) {
   return (
-    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0">
+    <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
-        formNumber=""
+        formNumber="Ф-6"
         title="Отчет о заключенных сделках"
         periodFrom={data.periodFrom}
         periodTo={data.periodTo}
@@ -68,8 +68,6 @@ export function Form6Report({ data }: Props) {
               <th className="border border-border px-3 py-2 text-left font-medium">Эмитент</th>
               <th className="border border-border px-3 py-2 text-left font-medium">Гос. рег. номер ЦБ</th>
               <th className="border border-border px-3 py-2 text-center font-medium">№ сделки</th>
-              <th className="border border-border px-3 py-2 text-left font-medium">Покупатель</th>
-              <th className="border border-border px-3 py-2 text-left font-medium">Продавец</th>
               <th className="border border-border px-3 py-2 text-right font-medium">Кол-во ЦБ</th>
               <th className="border border-border px-3 py-2 text-right font-medium">Цена</th>
               <th className="border border-border px-3 py-2 text-right font-medium">Объем</th>
@@ -83,8 +81,6 @@ export function Form6Report({ data }: Props) {
                 <td className="border border-border px-3 py-2">{row.secFullName || row.secCode}</td>
                 <td className="border border-border px-3 py-2">{row.secCode}</td>
                 <td className="border border-border px-3 py-2 text-center tabular-nums">{row.id}</td>
-                <td className="border border-border px-3 py-2">{row.buyerName}</td>
-                <td className="border border-border px-3 py-2">{row.sellerName}</td>
                 <td className="border border-border px-3 py-2 text-right tabular-nums">{formatInt(row.quantity)}</td>
                 <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNum(row.price)}</td>
                 <td className="border border-border px-3 py-2 text-right tabular-nums whitespace-normal">
@@ -97,7 +93,7 @@ export function Form6Report({ data }: Props) {
             ))}
             <tr className="bg-muted/80 font-bold">
               <td className="border border-border px-3 py-2">Итого:</td>
-              <td className="border border-border px-3 py-2" colSpan={5} />
+              <td className="border border-border px-3 py-2" colSpan={3} />
               <td className="border border-border px-3 py-2 text-right tabular-nums">
                 {formatInt(data.totalQuantity)}
               </td>
@@ -108,7 +104,7 @@ export function Form6Report({ data }: Props) {
               <td className="border border-border px-3 py-2" />
             </tr>
             <tr className="bg-muted/80">
-              <td className="border border-border px-3 py-2" colSpan={10}>
+              <td className="border border-border px-3 py-2" colSpan={8}>
                 Количество сделок: {data.dealCount}
               </td>
             </tr>

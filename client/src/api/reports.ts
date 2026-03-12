@@ -88,6 +88,34 @@ export function runUsdReport(dateFrom: string, dateTo: string, ownId?: number): 
   return api.post('/reports/usd', { dateFrom, dateTo, ownId });
 }
 
+export interface TodayTrade {
+  id: string;
+  tradeDate: string;
+  settleDate: string | null;
+  classCode: string;
+  className?: string;
+  secCode: string;
+  secFullName?: string;
+  buyerName?: string | null;
+  sellerName?: string | null;
+  quantity: number;
+  price: number;
+  value: number;
+}
+
+export function getTodayTrades(): Promise<TodayTrade[]> {
+  return api.get('/reports/today-trades');
+}
+
+export interface DailyVolumePoint {
+  date: string;
+  totalValue: number;
+}
+
+export function getDailyVolumes(month: string): Promise<{ month: string; points: DailyVolumePoint[] }> {
+  return api.get(`/reports/daily-volumes?month=${encodeURIComponent(month)}`);
+}
+
 export async function exportReport(params: {
   reportFormId: number;
   dataSourceIds?: number[];

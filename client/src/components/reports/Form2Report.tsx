@@ -57,7 +57,7 @@ export default function Form2Report({ data, className, showTotalSummary = true }
   return (
     <div
       className={cn(
-        'w-full bg-white pb-6 text-xs print:max-w-none print:px-0',
+        'w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0',
         className
       )}
     >
