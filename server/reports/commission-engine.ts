@@ -17,14 +17,6 @@ export interface CommissionResult {
   buyerRatePercent?: number;
 }
 
-function isTariffActiveForDate(t: CommissionTariff, date?: string): boolean {
-  if (!date) return true;
-  const d = date.slice(0, 10);
-  if (t.valid_from && d < t.valid_from.toString()) return false;
-  if (t.valid_to && d > t.valid_to.toString()) return false;
-  return t.is_active;
-}
-
 export function resolveTariffForVolume(
   tariffs: CommissionTariff[],
   volume: number,
@@ -33,7 +25,7 @@ export function resolveTariffForVolume(
 ): CommissionTariff | null {
   const v = Number(volume) || 0;
   const applicable = tariffs.filter((t) => {
-    if (!isTariffActiveForDate(t, tradeDate)) return false;
+    if (!t.is_active) return false;
     if (t.side !== 'both' && t.side !== side) return false;
     const fromOk = v >= Number(t.volume_from ?? 0);
     const to = t.volume_to != null ? Number(t.volume_to) : null;

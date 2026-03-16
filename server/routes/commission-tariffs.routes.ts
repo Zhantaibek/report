@@ -28,8 +28,6 @@ router.post('/', async (req, res) => {
     rate_percent,
     discount_percent,
     max_commission,
-    valid_from,
-    valid_to,
     is_active,
   } = body;
   if (side == null || rate_percent == null) {
@@ -45,8 +43,6 @@ router.post('/', async (req, res) => {
     rate_percent: Number(rate_percent),
     discount_percent: discount_percent != null ? Number(discount_percent) : null,
     max_commission: max_commission != null && max_commission !== '' ? Math.round(Number(max_commission)) : null,
-    valid_from: valid_from ?? null,
-    valid_to: valid_to ?? null,
     is_active: is_active !== false,
   });
   clearCommissionTariffsCache();
@@ -73,8 +69,6 @@ router.put('/:id', async (req, res) => {
         ? null
         : Math.round(Number(body.max_commission));
   }
-  if (body.valid_from !== undefined) data.valid_from = body.valid_from;
-  if (body.valid_to !== undefined) data.valid_to = body.valid_to;
   if (body.is_active !== undefined) data.is_active = Boolean(body.is_active);
 
   const row = await updateCommissionTariff(id, data as any);
