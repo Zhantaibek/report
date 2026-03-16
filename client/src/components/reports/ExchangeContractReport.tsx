@@ -36,7 +36,8 @@ function fmtDate(d: string | null | undefined): string {
   if (!d) return '—';
   const s = String(d).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  return s; // оставляем ISO формат как в макете: 2026-02-20
+  const [y, m, day] = s.split('-');
+  return `${day}.${m}.${y}`;
 }
 
 function fmtTime(d: string | null | undefined): string {
@@ -150,14 +151,14 @@ function OneContract({ data }: { data: ExchangeContractData }) {
       <Gap />
 
       {/* Блок 6: подписи трейдеров — 50% / 50% */}
-      <div className="flex items-end mt-1 mb-4">
-        <div className="w-1/2 min-w-0 pr-4">
-          <span className="text-foreground text-sm">Подпись трейдера Продавца</span>
-          <span className="inline-block border-b border-foreground w-full max-w-[8rem] ml-2 mb-0.5" />
+      <div className="flex mb-4">
+        <div className="w-1/2 flex items-end gap-2">
+          <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
+          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
         </div>
-        <div className="w-1/2 min-w-0">
-          <span className="text-foreground text-sm">Подпись трейдера Покупателя</span>
-          <span className="inline-block border-b border-foreground w-full max-w-[8rem] ml-2 mb-0.5" />
+        <div className="w-1/2 flex items-end gap-2">
+          <span className="text-sm text-foreground shrink-0">Подпись трейдера Покупателя</span>
+          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
         </div>
       </div>
 

@@ -84,8 +84,8 @@ function OneCertificate({ data }: { data: ExchangeCertificateData }) {
   const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
   const couponVal = data.couponRate != null ? `${fmtNum(data.couponRate, 0)} %` : '—';
   const yieldVal = data.yield != null ? `${fmtNum(data.yield, 2)} %` : '%';
-  const sellerComm = data.sellerCommission != null ? String(data.sellerCommission) : '0';
-  const buyerComm = data.buyerCommission != null ? String(data.buyerCommission) : '0';
+  const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
+  const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
 
   return (
     <div className="w-full bg-white text-sm leading-normal">
@@ -130,7 +130,7 @@ function OneCertificate({ data }: { data: ExchangeCertificateData }) {
       <Row label="Ставка купона:" value={couponVal} />
 
       {/* Две колонки: слева — количество, цена, доходность, сумма; справа — дата исполнения, комиссии */}
-      <div className="flex gap-6">
+      <div className="flex">
         <div className="w-1/2 min-w-0">
           <Row label="Количество ЦБ:" value={`${data.quantity.toLocaleString('ru-RU')} шт.`} />
           <Row label="Цена за 1 ЦБ:" value={`${fmtNum(data.price, 2)} с.`} />
@@ -139,15 +139,15 @@ function OneCertificate({ data }: { data: ExchangeCertificateData }) {
         </div>
         <div className="w-1/2 min-w-0">
           <Row label="Дата исполнения сделки:" value={fmtDate(data.settleDate)} />
-          <Row label="Комиссионный сбор с Продавца:" value={sellerComm} valueBold={false} />
-          <Row label="Комиссионный сбор с Покупателя:" value={buyerComm} valueBold={false} />
+          <Row label="Комиссионный сбор с Продавца:" value={sellerComm} />
+          <Row label="Комиссионный сбор с Покупателя:" value={buyerComm} />
         </div>
       </div>
 
       <Gap />
 
       {/* Подписи трейдеров — выше юридического текста */}
-      <div className="flex gap-6 mb-4">
+      <div className="flex mb-4">
         <div className="w-1/2 flex items-end gap-2">
           <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
           <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
