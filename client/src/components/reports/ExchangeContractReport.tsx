@@ -23,6 +23,8 @@ export interface ExchangeContractData {
   value: number;
   settleDate?: string | null;
   couponRate?: number | null;
+  sellerCommission?: number | null;
+  buyerCommission?: number | null;
 }
 
 function fmtNum(n: number | null | undefined, decimals = 8): string {
@@ -81,6 +83,8 @@ function OneContract({ data }: { data: ExchangeContractData }) {
   const couponVal = data.couponRate != null && data.couponRate > 0
     ? fmtNum(data.couponRate, 2)
     : '—';
+  const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
+  const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
 
   return (
     <div className="w-full bg-white text-sm leading-normal">
@@ -134,13 +138,13 @@ function OneContract({ data }: { data: ExchangeContractData }) {
         label1="Цена за 1 ЦБ"
         value1={`${fmtNum(data.price, 2)} с.`}
         label2="Комиссионный сбор с Продавца"
-        value2="—"
+        value2={sellerComm}
       />
       <Row2
         label1="Сумма сделки"
         value1={`${fmtNum(data.value, 2)} с.`}
         label2="Комиссионный сбор с Покупателя"
-        value2="—"
+        value2={buyerComm}
       />
 
       <Gap />

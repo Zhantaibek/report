@@ -146,10 +146,15 @@ export interface SelectOptionGroup {
 interface SelectWithSearchProps {
   value?: string;
   onValueChange?: (value: string) => void;
+  multiple?: boolean;
+  values?: string[];
+  onValuesChange?: (values: string[]) => void;
   disabled?: boolean;
   loading?: boolean;
   placeholder?: string;
   searchPlaceholder?: string;
+  /** Показывать ли строку поиска (по умолчанию true) */
+  withSearch?: boolean;
   options?: SelectOption[];
   groups?: SelectOptionGroup[];
   searchFields?: string[];
@@ -159,10 +164,14 @@ interface SelectWithSearchProps {
 function SelectWithSearch({
   value,
   onValueChange,
+  multiple,
+  values,
+  onValuesChange,
   disabled,
   loading,
   placeholder,
   searchPlaceholder = 'Поиск...',
+  withSearch = true,
   options,
   groups,
   searchFields = ['label'],
@@ -200,10 +209,18 @@ function SelectWithSearch({
     return [];
   }, [options, groups]);
 
-  const selectedLabel = React.useMemo(
-    () => allOptions.find((o) => o.value === value)?.label,
-    [allOptions, value]
-  );
+  const selectedLabel = React.useMemo(() => {
+    if (multiple && values && values.length > 0) {
+      const labels = values
+        .map((v) => allOptions.find((o) => o.value === v)?.label)
+        .filter(Boolean) as string[];
+      if (labels.length === 0) return undefined;
+      if (labels.length === 1) return labels[0];
+      if (labels.length === 2) return `${labels[0]}, ${labels[1]}`;
+      return `${labels[0]}, ${labels[1]} +${labels.length - 2}`;
+    }
+    return allOptions.find((o) => o.value === value)?.label;
+  }, [allOptions, value, multiple, values]);
 
   const matchesSearch = (opt: SelectOption) => {
     if (!search.trim()) return true;
@@ -221,6 +238,13 @@ function SelectWithSearch({
     (filteredGroups && filteredGroups.length > 0);
 
   const handleSelect = (val: string) => {
+    if (multiple) {
+      const current = values ?? [];
+      const exists = current.includes(val);
+      const next = exists ? current.filter((v) => v !== val) : [...current, val];
+      onValuesChange?.(next);
+      return;
+    }
     onValueChange?.(val);
     setOpen(false);
     setSearch('');
@@ -252,22 +276,30 @@ function SelectWithSearch({
         <div
           ref={listRef}
           className="absolute z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md"
-          style={{ maxHeight: '25rem', display: 'flex', flexDirection: 'column', minWidth: '100%', width: 'max-content', maxWidth: '620px' }}
+          style={{
+            maxHeight: '18rem',
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 'min(26rem, 100vw - 2rem)',
+            width: 'min(26rem, 100vw - 2rem)',
+          }}
         >
           {/* Search input */}
-          <div className="flex items-center gap-1.5 border-b px-2 py-1.5 shrink-0">
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input
-              ref={inputRef}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') { setOpen(false); setSearch(''); }
-              }}
-              placeholder={searchPlaceholder}
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          {withSearch && (
+            <div className="flex items-center gap-1.5 border-b px-2 py-1.5 shrink-0">
+              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setOpen(false); setSearch(''); }
+                }}
+                placeholder={searchPlaceholder}
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          )}
 
           {/* List */}
           <div className="overflow-y-auto p-1.5">
@@ -276,21 +308,24 @@ function SelectWithSearch({
             )}
 
             {/* Плоский список */}
-            {filteredOptions?.map((opt) => (
-              <div
-                key={opt.value}
-                onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
-                className={cn(
-                  'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
-                  opt.value === value && 'bg-muted'
-                )}
-              >
-                <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
-                  {opt.value === value && <Check className="h-4 w-4" />}
-                </span>
-                <span className="truncate">{opt.label}</span>
-              </div>
-            ))}
+            {filteredOptions?.map((opt) => {
+              const selected = multiple ? (values ?? []).includes(opt.value) : opt.value === value;
+              return (
+                <div
+                  key={opt.value}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
+                  className={cn(
+                    'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
+                    selected && 'bg-muted'
+                  )}
+                >
+                  <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+                    {selected && <Check className="h-4 w-4" />}
+                  </span>
+                  <span className="truncate">{opt.label}</span>
+                </div>
+              );
+            })}
 
             {/* Сгруппированный список */}
             {filteredGroups?.map((g) => (
@@ -299,21 +334,24 @@ function SelectWithSearch({
                   {g.icon}
                   {g.label}
                 </div>
-                {g.options.map((opt) => (
-                  <div
-                    key={opt.value}
-                    onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
-                    className={cn(
-                      'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
-                      opt.value === value && 'bg-muted'
-                    )}
-                  >
-                    <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
-                      {opt.value === value && <Check className="h-4 w-4" />}
-                    </span>
-                    <span className="truncate">{opt.label}</span>
-                  </div>
-                ))}
+                {g.options.map((opt) => {
+                  const selected = multiple ? (values ?? []).includes(opt.value) : opt.value === value;
+                  return (
+                    <div
+                      key={opt.value}
+                      onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
+                      className={cn(
+                        'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
+                        selected && 'bg-muted'
+                      )}
+                    >
+                      <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+                        {selected && <Check className="h-4 w-4" />}
+                      </span>
+                      <span className="truncate">{opt.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>

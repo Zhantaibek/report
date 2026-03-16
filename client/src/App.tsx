@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.tsx';
 import Reports from './pages/Reports.tsx';
 import Users from './pages/admin/Users.tsx';
 import ReportFormsAdmin from './pages/admin/ReportForms.tsx';
+import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -60,6 +61,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminRoute><ReportFormsAdmin /></AdminRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/commission-tariffs"
+          element={
+            <ProtectedRoute>
+              <AdminRoute><CommissionTariffs /></AdminRoute>
             </ProtectedRoute>
           }
         />

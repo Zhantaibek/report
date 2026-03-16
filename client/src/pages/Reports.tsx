@@ -1106,6 +1106,8 @@ export default function Reports() {
                         value: Number(row.value ?? 0),
                         settleDate: row.settleDate != null ? String(row.settleDate) : null,
                         couponRate: row.couponRate != null ? Number(row.couponRate) : null,
+                        sellerCommission: row.sellerCommission != null ? Number(row.sellerCommission) : null,
+                        buyerCommission: row.buyerCommission != null ? Number(row.buyerCommission) : null,
                       };
                       return (
                         <div key={`exchange-contract-${row.id ?? idx}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>

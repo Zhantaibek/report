@@ -15,7 +15,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Главная' },
     { to: '/reports', label: 'Отчёты' },
     ...(user?.role === 'admin'
-      ? [{ to: '/admin/users', label: 'Сотрудники' }]
+      ? [
+          { to: '/admin/users', label: 'Сотрудники' },
+          { to: '/admin/commission-tariffs', label: 'Тарифы' },
+        ]
       : []),
   ];
 

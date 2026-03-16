@@ -8,6 +8,7 @@ import { runChart } from './runners/chart-runner.js';
 import type { RunReportParams } from '../types/index.js';
 import { getReportDefinition, getSqlForReport } from './report-definitions.js';
 import { getReportFormById } from '../db/repositories/reportForms.js';
+import { calculateCommissionForTrade } from './commission-engine.js';
 
 export async function runReport(params: RunReportParams): Promise<ReportResult> {
   const { reportFormId, dataSourceIds = [], filters } = params;
@@ -75,13 +76,47 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     uniqueTrades = Array.from(uniqueTradesMap.values());
   }
 
+  // Обогащаем уникальные сделки рассчитанными комиссиями (если есть объём)
+  const withCommissions: Trade[] = [];
+  for (const trade of uniqueTrades) {
+    const value = Number((trade as any).value ?? 0);
+    if (!Number.isFinite(value) || value <= 0) {
+      withCommissions.push(trade);
+      continue;
+    }
+    const classCode = (trade as any).classCode as string | undefined;
+    const tradeDateRaw =
+      (trade as any).tradeDate ??
+      (trade as any).dealDate ??
+      trade.dealTime ??
+      undefined;
+    const tradeDate =
+      tradeDateRaw instanceof Date ? tradeDateRaw.toISOString().slice(0, 10) : (tradeDateRaw ? String(tradeDateRaw).slice(0, 10) : undefined);
+
+    const { sellerCommission, buyerCommission } = await calculateCommissionForTrade({
+      classCode,
+      value,
+      tradeDate,
+    });
+
+    if (sellerCommission == null && buyerCommission == null) {
+      withCommissions.push(trade);
+    } else {
+      withCommissions.push({
+        ...trade,
+        sellerCommission,
+        buyerCommission,
+      } as Trade);
+    }
+  }
+
   // Если использовался custom SQL с параметрами, фильтрация уже применена в запросе
   // Для аукционов в строках нет brokerId — применяем только фильтр по инструменту
   const filtered = sqlQuery
-    ? applyFilters(uniqueTrades, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7')
+    ? applyFilters(withCommissions, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7')
         ? { instrument: filters.instrument, classCode: filters.classCode }
         : { brokerId: filters.brokerId, firmCode: filters.firmCode, instrument: filters.instrument, classCode: filters.classCode })
-    : applyFilters(uniqueTrades, filters);
+    : applyFilters(withCommissions, filters);
   const normalized = normalizeTradesForReport(filtered);
 
   if (form.type === 'table') {

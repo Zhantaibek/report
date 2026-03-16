@@ -6,6 +6,7 @@ import reportFormsRoutes from './report-forms.routes.js';
 import reportsRoutes from './reports.routes.js';
 import dataSourcesRoutes from './data-sources.routes.js';
 import usersRoutes from './users.routes.js';
+import commissionTariffsRoutes from './commission-tariffs.routes.js';
 
 const api = Router();
 const base = config.apiBase;
@@ -16,7 +17,7 @@ api.use('/report-forms', reportFormsRoutes);
 api.use('/reports', reportsRoutes);
 api.use('/data-sources', dataSourcesRoutes);
 api.use('/users', usersRoutes);
-// Админский роут для форм отчетов удален - формы теперь в коде (report-definitions.ts)
+api.use('/commission-tariffs', commissionTariffsRoutes);
 
 export const routes = Router();
 routes.use(base, api);

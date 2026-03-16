@@ -23,6 +23,18 @@ CREATE TABLE IF NOT EXISTS report_forms (
   single_date BOOLEAN DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS commission_tariffs (
+  id SERIAL PRIMARY KEY,
+  class_code TEXT,
+  volume_from NUMERIC(18,0) NOT NULL,
+  volume_to NUMERIC(18,0),
+  side TEXT NOT NULL CHECK (side IN ('seller', 'buyer', 'both')),
+  rate_percent NUMERIC(9,2) NOT NULL,
+  discount_percent NUMERIC(9,2),
+  max_commission NUMERIC(18,0),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
 -- Курсы валют к сому: одна строка на каждый день и каждую валюту
 CREATE TABLE IF NOT EXISTS currency_rates (
   id SERIAL PRIMARY KEY,
@@ -62,6 +74,62 @@ END $$;
 
 -- Уникальный индекс (currency_code, rate_date) — для существующих установок
 CREATE UNIQUE INDEX IF NOT EXISTS currency_rates_code_date_idx ON currency_rates(currency_code, rate_date);
+
+-- Commission tariffs: добавляем class_code для существующих БД, если его ещё нет
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'commission_tariffs' AND column_name = 'class_code'
+  ) THEN
+    ALTER TABLE commission_tariffs ADD COLUMN class_code TEXT;
+  END IF;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Commission tariffs: объёмы без дробной части (миграция для существующих БД)
+DO $$ BEGIN
+  ALTER TABLE commission_tariffs ALTER COLUMN volume_from TYPE NUMERIC(18,0) USING volume_from::numeric(18,0);
+EXCEPTION WHEN others THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE commission_tariffs ALTER COLUMN volume_to TYPE NUMERIC(18,0) USING volume_to::numeric(18,0);
+EXCEPTION WHEN others THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE commission_tariffs ALTER COLUMN rate_percent TYPE NUMERIC(9,2) USING rate_percent::numeric(9,2);
+EXCEPTION WHEN others THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE commission_tariffs ALTER COLUMN discount_percent TYPE NUMERIC(9,2) USING discount_percent::numeric(9,2);
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Commission tariffs: верхний предел комиссии
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'commission_tariffs' AND column_name = 'max_commission'
+  ) THEN
+    ALTER TABLE commission_tariffs ADD COLUMN max_commission NUMERIC(18,0);
+  END IF;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Commission tariffs: удаляем priority для существующих БД
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'commission_tariffs' AND column_name = 'priority'
+  ) THEN
+    ALTER TABLE commission_tariffs DROP COLUMN priority;
+  END IF;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  DROP TABLE IF EXISTS commission_tariff_classes;
+EXCEPTION WHEN others THEN NULL;
+END $$;
 
 -- Миграция: удаляем таблицы data_sources, field_mappings, brokers (перенесены в код / .env)
 DO $$ BEGIN
