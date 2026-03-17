@@ -5,16 +5,41 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Modal } from '../../components/ui/modal.tsx';
 import { api } from '../../api/client.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { Plus, Pencil, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, KeyRound, UserRound, X } from 'lucide-react';
+import { Alert, AlertDescription } from '../../components/ui/alert.tsx';
 
 const LOGIN_REGEX = /^[a-z0-9_]{3,}$/;
 function isLoginValid(value: string): boolean {
   return value.length >= 3 && LOGIN_REGEX.test(value);
 }
 
-function generatePasswordFromLogin(loginValue: string): string {
-  const base = (loginValue.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user').slice(0, 20);
-  return base + '123';
+const BROKER_NICKNAMES: string[] = [
+  'broker_pro',
+  'market_maker',
+  'deal_master',
+  'trade_wizard',
+  'floor_broker',
+  'limit_keeper',
+  'order_runner',
+  'bid_ask_pro',
+  'volume_tracker',
+  'exchange_agent',
+];
+
+function generateBrokerLogin(): string {
+  const idx = Math.floor(Math.random() * BROKER_NICKNAMES.length);
+  return BROKER_NICKNAMES[idx];
+}
+
+function generatePasswordFromLogin(_loginValue: string): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const length = 7;
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    const idx = Math.floor(Math.random() * chars.length);
+    result += chars[idx];
+  }
+  return result;
 }
 
 interface UserRow {
@@ -48,6 +73,13 @@ export default function Users() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [confirmState, setConfirmState] = useState<
+    | { type: 'delete'; user: UserRow }
+    | { type: 'reset'; user: UserRow }
+    | null
+  >(null);
 
   const loadUsers = () => {
     api.get<UserRow[]>('/users').then(setList).catch(() => {});
@@ -56,6 +88,17 @@ export default function Users() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  useEffect(() => {
+    if (!submitSuccess && !resetMessage) return;
+    const id = window.setTimeout(() => {
+      setSubmitSuccess('');
+      setResetMessage('');
+    }, 10_000);
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [submitSuccess, resetMessage]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -79,6 +122,7 @@ export default function Users() {
     setDisplayName('');
     setRole('employee');
     setSubmitError('');
+    setSubmitSuccess('');
     setLoginError('');
     setFormOpen(true);
   };
@@ -113,6 +157,7 @@ export default function Users() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
+    setSubmitSuccess('');
     if (!isLoginValid(login)) {
       setLoginError('Только латинские буквы (a–z), цифры и символ _; минимум 3 символа');
       return;
@@ -128,6 +173,7 @@ export default function Users() {
         };
         if (password.trim()) body.password = password;
         await api.put(`/users/${editingId}`, body);
+        setSubmitSuccess('Изменения сохранены');
       } else {
         if (!password.trim()) {
           setSubmitError('Укажите пароль');
@@ -135,6 +181,7 @@ export default function Users() {
           return;
         }
         await api.post('/users', { login, password, role, displayName: displayName || null });
+        setSubmitSuccess('Пользователь успешно создан');
       }
       loadUsers();
       closeForm();
@@ -146,13 +193,42 @@ export default function Users() {
   };
 
   const handleDelete = async (id: number, loginName: string) => {
-    if (!window.confirm(`Удалить пользователя «${loginName}»?`)) return;
+    const user = list.find((u) => u.id === id);
+    if (!user) return;
+    setConfirmState({ type: 'delete', user });
+  };
+
+  const performDelete = async (user: UserRow) => {
     setLoading(true);
     try {
-      await api.delete(`/users/${id}`);
+      await api.delete(`/users/${user.id}`);
       loadUsers();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Ошибка удаления');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (user: UserRow) => {
+    setConfirmState({ type: 'reset', user });
+  };
+
+  const performResetPassword = async (user: UserRow) => {
+    const newPassword = generatePasswordFromLogin(user.login);
+    setResetMessage('');
+    setLoading(true);
+    try {
+      await api.put(`/users/${user.id}`, {
+        login: user.login,
+        role: user.role,
+        displayName: user.display_name ?? '',
+        password: newPassword,
+      });
+      loadUsers();
+      setResetMessage(`Новый пароль для «${user.login}»: ${newPassword}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ошибка сброса пароля');
     } finally {
       setLoading(false);
     }
@@ -181,6 +257,36 @@ export default function Users() {
           </div>
         </CardHeader>
         <CardContent>
+          {submitSuccess && (
+            <div className="mb-3">
+              <Alert variant="success" className="relative pr-10">
+                <AlertDescription>{submitSuccess}</AlertDescription>
+                <button
+                  type="button"
+                  onClick={() => setSubmitSuccess('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-800/70 hover:text-emerald-900"
+                  aria-label="Закрыть уведомление"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </Alert>
+            </div>
+          )}
+          {resetMessage && (
+            <div className="mb-3">
+              <Alert variant="success" className="relative pr-10">
+                <AlertDescription>{resetMessage}</AlertDescription>
+                <button
+                  type="button"
+                  onClick={() => setResetMessage('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-800/70 hover:text-emerald-900"
+                  aria-label="Закрыть уведомление"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </Alert>
+            </div>
+          )}
           <Modal
             open={formOpen}
             onClose={closeForm}
@@ -193,14 +299,26 @@ export default function Users() {
               )}
               <div>
                 <label className="block text-sm font-medium mb-1">Логин</label>
-                <input
-                  type="text"
-                  value={login}
-                  onChange={(e) => handleLoginChange(e.target.value)}
-                  required
-                  className={`w-full h-9 rounded-md border bg-background px-3 text-sm ${loginError ? 'border-destructive' : 'border-input'}`}
-                  autoComplete="username"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={login}
+                    onChange={(e) => handleLoginChange(e.target.value)}
+                    required
+                    className={`w-full h-9 rounded-md border bg-background px-3 pr-20 text-sm ${
+                      loginError ? 'border-destructive' : 'border-input'
+                    }`}
+                    autoComplete="username"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleLoginChange(generateBrokerLogin())}
+                    className="absolute right-1 p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                    title="Сгенерировать логин маклера"
+                  >
+                    <UserRound size={18} />
+                  </button>
+                </div>
                 {loginError && <p className="text-xs text-destructive mt-1">{loginError}</p>}
               </div>
               <div>
@@ -219,7 +337,10 @@ export default function Users() {
                   <div className="absolute right-1 flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => setPassword(generatePasswordFromLogin(login))}
+                      onClick={() => {
+                        setPassword(generatePasswordFromLogin(login));
+                        setShowPassword(true);
+                      }}
                       className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition"
                       title="Сгенерировать пароль"
                     >
@@ -270,6 +391,50 @@ export default function Users() {
             </form>
           </Modal>
 
+          {confirmState && (
+            <Modal
+              open={true}
+              onClose={() => setConfirmState(null)}
+              closeOnBackdropClick={false}
+              title={confirmState.type === 'delete' ? 'Удалить пользователя' : 'Сброс пароля'}
+            >
+              <div className="space-y-4">
+                <p className="text-sm">
+                  {confirmState.type === 'delete'
+                    ? `Удалить пользователя «${confirmState.user.login}»?`
+                    : `Сбросить пароль пользователя «${confirmState.user.login}»?`}
+                </p>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setConfirmState(null)}
+                    disabled={loading}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={confirmState.type === 'delete' ? 'destructive' : 'default'}
+                    onClick={async () => {
+                      const state = confirmState;
+                      if (!state) return;
+                      setConfirmState(null);
+                      if (state.type === 'delete') {
+                        await performDelete(state.user);
+                      } else {
+                        await performResetPassword(state.user);
+                      }
+                    }}
+                    disabled={loading}
+                  >
+                    {confirmState.type === 'delete' ? 'Удалить' : 'Сбросить'}
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
+
           {list.length === 0 ? (
             <p className="text-sm text-muted-foreground">Нет сотрудников</p>
           ) : (
@@ -281,7 +446,7 @@ export default function Users() {
                     <TableHead>Логин</TableHead>
                     <TableHead>Имя</TableHead>
                     <TableHead>Роль</TableHead>
-                    <TableHead className="w-24 text-right">Действия</TableHead>
+                    <TableHead className="w-32 text-right">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -310,6 +475,17 @@ export default function Users() {
                               title="Изменить"
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleResetPassword(u)}
+                              disabled={loading}
+                              title="Сбросить пароль"
+                            >
+                              <KeyRound className="h-4 w-4" />
                             </Button>
                             <Button
                               type="button"

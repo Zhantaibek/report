@@ -42,12 +42,6 @@ export function resolveTariffForVolume(
   return applicable[0];
 }
 
-function applyDiscount(baseRate: number, tariff: CommissionTariff, _ctx: CommissionContext): number {
-  const discount = tariff.discount_percent != null ? Number(tariff.discount_percent) : 0;
-  if (!discount) return baseRate;
-  return baseRate - discount;
-}
-
 export async function calculateCommissionForTrade(ctx: {
   classCode?: string;
   value?: number;
@@ -63,23 +57,23 @@ export async function calculateCommissionForTrade(ctx: {
 
   const sellerTariff = resolveTariffForVolume(tariffsForClass, volume, 'seller', ctx.tradeDate);
   const buyerTariff = resolveTariffForVolume(tariffsForClass, volume, 'buyer', ctx.tradeDate);
-
+ 
   const result: CommissionResult = {};
 
-  // 1) Тариф "Обе стороны" — общая комиссия делится поровну между продавцом и покупателем
+  // 1) Тариф "Обе стороны" — общая комиссия делится поровну между продавцом и покупателем.
+  // discount_percent трактуем как % от суммы комиссии (а не от ставки).
   if (sellerTariff && buyerTariff && sellerTariff.id === buyerTariff.id && sellerTariff.side === 'both') {
     const baseRate = Number(sellerTariff.rate_percent);
-    const rate = applyDiscount(baseRate, sellerTariff, {
-      classCode: ctx.classCode,
-      volume,
-      side: 'seller',
-      tradeDate: ctx.tradeDate,
-    });
-    const rawCommission = (volume * rate) / 100;
+    const discount = sellerTariff.discount_percent != null ? Number(sellerTariff.discount_percent) : 0;
+
+    const rawCommission = (volume * baseRate) / 100;
     const cap = sellerTariff.max_commission != null ? Number(sellerTariff.max_commission) : null;
-    const totalCommission = cap != null ? Math.min(rawCommission, cap) : rawCommission;
+    let totalCommission = cap != null ? Math.min(rawCommission, cap) : rawCommission;
+    if (discount) {
+      totalCommission = totalCommission * (1 - discount / 100);
+    }
     const halfCommission = totalCommission / 2;
-    const perSideRate = rate / 2;
+    const perSideRate = baseRate / 2;
 
     result.sellerRatePercent = perSideRate;
     result.buyerRatePercent = perSideRate;
@@ -92,15 +86,17 @@ export async function calculateCommissionForTrade(ctx: {
   // 2) Отдельный тариф для продавца
   if (sellerTariff) {
     const baseRate = Number(sellerTariff.rate_percent);
-    let rate = applyDiscount(baseRate, sellerTariff, {
-      classCode: ctx.classCode,
-      volume,
-      side: 'seller',
-      tradeDate: ctx.tradeDate,
-    });
-    let rawCommission = (volume * rate) / 100;
+    const discount = sellerTariff.discount_percent != null ? Number(sellerTariff.discount_percent) : 0;
+    let rate = baseRate;
+
+    let commission = (volume * rate) / 100;
+    if (discount) {
+      commission = commission * (1 - discount / 100);
+    }
     const cap = sellerTariff.max_commission != null ? Number(sellerTariff.max_commission) : null;
-    let commission = cap != null ? Math.min(rawCommission, cap) : rawCommission;
+    if (cap != null) {
+      commission = Math.min(commission, cap);
+    }
 
     // Если сторона тарифа "продавец", считаем, что ставка задана для обеих сторон и продавец платит только половину
     if (sellerTariff.side === 'seller') {
@@ -115,15 +111,17 @@ export async function calculateCommissionForTrade(ctx: {
   // 3) Отдельный тариф для покупателя — платит половину комиссии по своему тарифу
   if (buyerTariff) {
     const baseRate = Number(buyerTariff.rate_percent);
-    let rate = applyDiscount(baseRate, buyerTariff, {
-      classCode: ctx.classCode,
-      volume,
-      side: 'buyer',
-      tradeDate: ctx.tradeDate,
-    });
-    let rawCommission = (volume * rate) / 100;
+    const discount = buyerTariff.discount_percent != null ? Number(buyerTariff.discount_percent) : 0;
+    let rate = baseRate;
+
+    let commission = (volume * rate) / 100;
+    if (discount) {
+      commission = commission * (1 - discount / 100);
+    }
     const cap = buyerTariff.max_commission != null ? Number(buyerTariff.max_commission) : null;
-    let commission = cap != null ? Math.min(rawCommission, cap) : rawCommission;
+    if (cap != null) {
+      commission = Math.min(commission, cap);
+    }
 
     if (buyerTariff.side === 'buyer') {
       rate = rate / 2;
