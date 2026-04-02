@@ -2,6 +2,7 @@ import { api } from './client.ts';
 
 export interface CurrencyRate {
   currencyCode: string;
+  rateDate: string;
   rate: number;
   baseCurrency: string;
   updatedAt: string;

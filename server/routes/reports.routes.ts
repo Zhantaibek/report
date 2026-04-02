@@ -121,7 +121,7 @@ router.post('/usd', async (req, res) => {
       oracleRows.map(async (row) => {
         const rateRow = await getCurrencyRateForDate('USD', row.trade_date);
         const usd_rate = rateRow?.rate ?? null;
-        const volume_som = usd_rate != null ? Math.round(row.volume_usd * usd_rate * 100) / 100 : null;
+        const volume_som = usd_rate != null ? row.volume_usd * usd_rate : null;
         return {
           trade_date: row.trade_date,
           deal_count: row.deal_count,

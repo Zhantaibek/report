@@ -280,8 +280,8 @@ function SelectWithSearch({
             maxHeight: '18rem',
             display: 'flex',
             flexDirection: 'column',
-            minWidth: 'min(26rem, 100vw - 2rem)',
-            width: 'min(26rem, 100vw - 2rem)',
+            minWidth: 'min(42rem, 100vw - 2rem)',
+            width: 'min(42rem, 100vw - 2rem)',
           }}
         >
           {/* Search input */}
@@ -322,7 +322,7 @@ function SelectWithSearch({
                   <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
                     {selected && <Check className="h-4 w-4" />}
                   </span>
-                  <span className="truncate">{opt.label}</span>
+                  <span>{opt.label}</span>
                 </div>
               );
             })}
@@ -348,7 +348,7 @@ function SelectWithSearch({
                       <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
                         {selected && <Check className="h-4 w-4" />}
                       </span>
-                      <span className="truncate">{opt.label}</span>
+                      <span>{opt.label}</span>
                     </div>
                   );
                 })}

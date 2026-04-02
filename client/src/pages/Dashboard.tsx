@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayError, setTodayError] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rateMonth, setRateMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [volumes, setVolumes] = useState<DailyVolumePoint[]>([]);
   const [volumesLoading, setVolumesLoading] = useState(false);
   const [volumesError, setVolumesError] = useState<string | null>(null);
@@ -132,27 +133,22 @@ export default function Dashboard() {
     if (ratesHistory.length === 0) {
       return { labels: [], series: [] as { name: string; data: number[] }[] };
     }
-    const monthPrefix = month; // YYYY-MM
     const usd = ratesHistory
-      .filter((r) => r.currencyCode === 'USD' && (r as any).rateDate?.startsWith(monthPrefix))
-      .sort((a, b) => String((a as any).rateDate).localeCompare(String((b as any).rateDate)));
+      .filter((r) => r.currencyCode === 'USD' && r.rateDate?.startsWith(rateMonth))
+      .sort((a, b) => a.rateDate.localeCompare(b.rateDate));
     if (usd.length === 0) {
       return { labels: [], series: [] as { name: string; data: number[] }[] };
     }
     const labels = usd.map((r) => {
-      const d = String((r as any).rateDate ?? r.updatedAt).slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        const [, m, day] = d.split('-');
-        return `${day}.${m}`;
-      }
-      return d;
+      const d = r.rateDate.slice(0, 10);
+      const [, m, day] = d.split('-');
+      return `${day}.${m}`;
     });
-    const data = usd.map((r) => r.rate);
     return {
       labels,
-      series: [{ name: 'USD/сом', data }],
+      series: [{ name: 'USD/сом', data: usd.map((r) => r.rate) }],
     };
-  }, [ratesHistory, month]);
+  }, [ratesHistory, rateMonth]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -196,14 +192,25 @@ export default function Dashboard() {
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
-              <a
-                href="https://www.nbkr.kg/index.jsp?lang=RUS"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Источник: НБКР
-              </a>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Месяц:</span>
+                  <input
+                    type="month"
+                    value={rateMonth}
+                    onChange={(e) => setRateMonth(e.target.value)}
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                  />
+                </div>
+                <a
+                  href="https://www.nbkr.kg/index.jsp?lang=RUS"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Источник: НБКР
+                </a>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-2 pb-3">
@@ -219,7 +226,7 @@ export default function Dashboard() {
             {currencyChartData.labels.length === 0 ? (
               <p className="text-sm text-muted-foreground">Нет данных по курсу USD за выбранный месяц.</p>
             ) : (
-              <ReportChart labels={currencyChartData.labels} series={currencyChartData.series} />
+              <ReportChart labels={currencyChartData.labels} series={currencyChartData.series} type="area" />
             )}
           </CardContent>
         </Card>

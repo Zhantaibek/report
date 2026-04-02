@@ -11,12 +11,12 @@ export interface UsdReportRow {
   volume_som: number;
 }
 
-function fmt(n: number | string | null | undefined, decimals = 2): string {
+function fmt(n: number | string | null | undefined, decimals?: number): string {
   const val = typeof n === 'string' ? Number(n) : n;
   if (val == null || Number.isNaN(val)) return '—';
   return Number(val).toLocaleString('ru-RU', {
     minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    maximumFractionDigits: decimals ?? 10,
   });
 }
 
@@ -94,7 +94,7 @@ export function UsdReport({
                   {fmt(row.usd_rate, 2)}
                 </td>
                 <td className="border border-border px-3 py-1.5 text-right tabular-nums">
-                  {fmt(row.volume_som, 2)}
+                  {fmt(row.volume_som)}
                 </td>
               </tr>
             ))}
@@ -108,7 +108,7 @@ export function UsdReport({
                 <td className="border border-border px-3 py-2 text-right tabular-nums">100</td>
                 <td className="border border-border px-3 py-2 text-right tabular-nums">{fmt(totalVolumeUsd, 2)}</td>
                 <td className="border border-border px-3 py-2 text-right tabular-nums">—</td>
-                <td className="border border-border px-3 py-2 text-right tabular-nums">{fmt(totalVolumeSom, 2)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{fmt(totalVolumeSom)}</td>
               </tr>
             </tfoot>
           )}
