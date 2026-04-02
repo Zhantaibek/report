@@ -68,6 +68,83 @@ export function AuctionSummary2Report({ data, reportDate }: { data: AuctionSumma
     <div className="w-full bg-white pb-6 text-sm print:max-w-none print:px-0">
       <ReportHeader formNumber="" title="Сводная ведомость" periodFrom={d} periodTo={d} />
 
+      {/* Итоги размещения (текущий аукцион) */}
+      <div className="mt-4">
+        <p className="mb-2 font-medium">Итоги размещения:</p>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse border border-border text-sm mb-6">
+            <thead>
+              <tr className="bg-muted/60">
+                <th className="border border-border px-3 py-2 text-left font-medium w-1/4">размещено:</th>
+                <th className="border border-border px-3 py-2 text-center font-medium">
+                  Кол-во ГЦБ (в штуках)
+                </th>
+                <th className="border border-border px-3 py-2 text-center font-medium">
+                  Сумма удовлетворенных заявок (по номиналу, в сомах)
+                </th>
+                <th className="border border-border px-3 py-2 text-center font-medium">
+                  Сумма удовлетворенных заявок (по факту, в сомах)
+                </th>
+                <th className="border border-border px-3 py-2 text-center font-medium">Средневзвешенная цена (сом)</th>
+                <th className="border border-border px-3 py-2 text-center font-medium">Доходность (в %)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-border px-3 py-2 font-medium">На конкурентной основе</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.qty_competitive_current, 0)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_nominal_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_actual_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.avg_price_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.avg_yield_competitive_current)}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-border px-3 py-2 font-medium">На неконкурентной основе</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.qty_non_competitive_current, 0)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_nominal_non_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_actual_non_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">—</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">—</td>
+              </tr>
+              <tr>
+                <td className="border border-border px-3 py-2 font-medium">Всего:</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.qty_total_current, 0)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_nominal_total_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.value_actual_total_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.avg_price_competitive_current)}
+                </td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">
+                  {formatNum(data.avg_yield_competitive_current)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Сравнение текущего и предыдущего аукциона */}
       <div>
         <div className="overflow-x-auto">

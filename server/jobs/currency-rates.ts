@@ -63,7 +63,13 @@ export async function fetchAndSaveRates(): Promise<RefreshResult> {
 async function parseAndSaveNbkrXml(xml: string, result: RefreshResult): Promise<void> {
   const TARGET_CODES = ['USD'];
 
-  const rateDate = new Date().toISOString().slice(0, 10);
+  // Реальный XML: <CurrencyRates Name="..." Date="DD.MM.YYYY">
+  const xmlDateMatch = xml.match(/<CurrencyRates[^>]+Date="(\d{2})\.(\d{2})\.(\d{4})"/i);
+  const rateDate = xmlDateMatch
+    ? `${xmlDateMatch[3]}-${xmlDateMatch[2]}-${xmlDateMatch[1]}`
+    : new Date().toISOString().slice(0, 10);
+
+  console.log(`[currency-job] XML rate date: ${rateDate}`);
 
   for (const code of TARGET_CODES) {
     const blockRe = new RegExp(
@@ -76,8 +82,14 @@ async function parseAndSaveNbkrXml(xml: string, result: RefreshResult): Promise<
     const valueStr = block.match(/<value>([\d,. ]+)<\/value>/i)?.[1];
     if (!valueStr) continue;
 
-    const rate = parseFloat(valueStr.replace(/\s/g, '').replace(',', '.'));
-    if (!isFinite(rate) || rate <= 0) continue;
+    // <Nominal> указывает за сколько единиц валюты дан курс (напр. KZT: Nominal=100)
+    const nominalStr = block.match(/<nominal>(\d+)<\/nominal>/i)?.[1];
+    const nominal = parseInt(nominalStr ?? '1', 10) || 1;
+
+    const rawRate = parseFloat(valueStr.replace(/\s/g, '').replace(',', '.'));
+    if (!isFinite(rawRate) || rawRate <= 0) continue;
+
+    const rate = rawRate / nominal;
 
     try {
       await upsertCurrencyRate(code, rate, rateDate);
