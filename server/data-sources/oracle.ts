@@ -37,14 +37,43 @@ function runJavaBridge(className: string, args: string[]): Promise<string> {
       bridgeDir: BRIDGE_DIR,
       className,
     });
+    const cp = [BRIDGE_DIR, OJDBC_JAR].join(path.delimiter);
+    const baseArgs = [host, String(port), sid, user, password, ...args];
+
     execFile(
       JAVA_BIN,
-      ['-cp', [BRIDGE_DIR, OJDBC_JAR].join(path.delimiter), className, host, String(port), sid, user, password, ...args],
+      ['-cp', cp, className, ...baseArgs],
       { cwd: BRIDGE_DIR, timeout: 30000 },
       (err, stdout, stderr) => {
-        if (stderr) console.warn(`[oracle-jdbc:${className}] stderr:`, stderr.trim());
-        if (err) { reject(new Error(stderr.trim() || err.message)); return; }
-        resolve(stdout.trim());
+        const errText = (stderr || '').trim();
+        if (!err) {
+          if (errText) console.warn(`[oracle-jdbc:${className}] stderr:`, errText);
+          resolve(stdout.trim());
+          return;
+        }
+
+        const classNotFound =
+          errText.includes(`ClassNotFoundException: ${className}`) ||
+          errText.includes(`Could not find or load main class ${className}`);
+        if (!classNotFound) {
+          reject(new Error(errText || err.message));
+          return;
+        }
+
+        execFile(
+          JAVA_BIN,
+          ['-cp', cp, `${className}.java`, ...baseArgs],
+          { cwd: BRIDGE_DIR, timeout: 30000 },
+          (err2, stdout2, stderr2) => {
+            const errText2 = (stderr2 || '').trim();
+            if (err2) {
+              reject(new Error(errText2 || err2.message));
+              return;
+            }
+            if (errText2) console.warn(`[oracle-jdbc:${className}] stderr:`, errText2);
+            resolve(stdout2.trim());
+          }
+        );
       }
     );
   });
