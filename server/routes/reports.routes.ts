@@ -114,7 +114,15 @@ router.post('/usd', async (req, res) => {
       return;
     }
 
-    const oracleRows = await queryOracleUsd(dateFrom, dateTo, ownId ? Number(ownId) : undefined);
+    const ownIdNum =
+      ownId !== undefined && ownId !== null && ownId !== ''
+        ? Number(ownId)
+        : undefined;
+    const oracleRows = await queryOracleUsd(
+      dateFrom,
+      dateTo,
+      ownIdNum !== undefined && Number.isFinite(ownIdNum) ? ownIdNum : undefined,
+    );
 
     // Добавляем курс USD из нашей PostgreSQL таблицы currency_rates
     const rows = await Promise.all(
@@ -151,7 +159,15 @@ router.post('/gold', async (req, res) => {
       res.status(400).json({ error: 'dateFrom and dateTo required' });
       return;
     }
-    const rows = await queryOracleGold(dateFrom, dateTo, ownId ? Number(ownId) : undefined);
+    const ownIdNum =
+      ownId !== undefined && ownId !== null && ownId !== ''
+        ? Number(ownId)
+        : undefined;
+    const rows = await queryOracleGold(
+      dateFrom,
+      dateTo,
+      ownIdNum !== undefined && Number.isFinite(ownIdNum) ? ownIdNum : undefined,
+    );
     res.json({ rows });
   } catch (err) {
     console.error('[/api/reports/gold]', err);

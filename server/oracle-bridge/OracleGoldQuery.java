@@ -26,7 +26,8 @@ public class OracleGoldQuery {
         String password = args[4];
         String dateFrom = args[5];
         String dateTo   = args[6];
-        long   ownId    = (args.length > 7 ? Long.parseLong(args[7]) : 8853816L) + 1;
+        // Значение = ARCTS.DEAL.OWNID (как ID в CURRINSTRUMENT), без сдвига.
+        long   ownId    = args.length > 7 ? Long.parseLong(args[7]) : 8853817L;
 
         LocalDate dFrom = LocalDate.parse(dateFrom);
         LocalDate dTo   = LocalDate.parse(dateTo);
