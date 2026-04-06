@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button.tsx';
 import { SelectWithSearch, type SelectOptionGroup } from '../components/ui/select.tsx';
 import { Play, Printer, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText } from 'lucide-react';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type OracleInstrument } from '../api/reports.ts';
+import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -67,6 +67,7 @@ const FORM_META: Record<string, FormMeta> = {
   // Документы по сделкам
   Exchange_Contract: { customView: true },
   Exchange_Certificate: { customView: true },
+  Exchange_Contract_Gold: { customView: true },
 };
 
 /** Формы с кастомным отображением (не таблица по умолчанию); для них доступна печать. */
@@ -148,6 +149,7 @@ export default function Reports() {
   });
   const [result, setResult] = useState<ReportResult | null>(null);
   const [usdRows, setUsdRows] = useState<UsdReportRow[] | null>(null);
+  const [goldRows, setGoldRows] = useState<GoldContractRow[] | null>(null);
   const [oracleInstruments, setOracleInstruments] = useState<OracleInstrument[]>([]);
   const [loadingInstruments, setLoadingInstruments] = useState(false);
   const [selectedOwnId, setSelectedOwnId] = useState<number | undefined>(undefined);
@@ -176,10 +178,15 @@ export default function Reports() {
     setValidationError(null);
     setPage(1);
     setUsdRows(null);
+    setGoldRows(null);
     try {
       if (selectedForm?.code === 'Blank_Form_USD') {
         const res = await runUsdReport(filters.dateFrom, filters.dateTo, selectedOwnId);
         setUsdRows(res.rows);
+        setResult(null);
+      } else if (selectedForm?.code === 'Exchange_Contract_Gold') {
+        const res = await runGoldReport(filters.dateFrom, filters.dateTo, selectedOwnId);
+        setGoldRows(res.rows);
         setResult(null);
       } else {
         const res = await runReport({
@@ -192,6 +199,7 @@ export default function Reports() {
       console.error(err);
       setResult(null);
       setUsdRows(null);
+      setGoldRows(null);
       setRunError(err instanceof Error ? err.message : 'Ошибка при формировании отчёта');
     } finally {
       setLoading(false);
@@ -275,6 +283,9 @@ export default function Reports() {
 
   // Общая пагинация для всех отчётов — один расчёт для верхнего и нижнего блока
   const paginationInfo = useMemo(() => {
+    if (selectedForm?.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length > 0) {
+      return { totalRecords: goldRows.length, totalPages: goldRows.length };
+    }
     if (!result || !selectedForm) return null;
     if (result.type === 'table' && selectedForm.code === 'Blank_Form_1' && groupedResult && result.rows.length > 0)
       return { totalRecords: groupedResult.total, totalPages: groupedResult.totalPages };
@@ -322,7 +333,7 @@ export default function Reports() {
     if (result.type === 'table' && result.rows.length > 0)
       return { totalRecords: result.total, totalPages: Math.ceil(result.total / limit) };
     return null;
-  }, [result, selectedForm, groupedResult, limit]);
+  }, [result, selectedForm, groupedResult, goldRows, limit]);
 
   return (
     <div>
@@ -347,10 +358,11 @@ export default function Reports() {
                     setResult(null);
                     setPage(1);
                     setUsdRows(null);
+                    setGoldRows(null);
                     setSelectedOwnId(undefined);
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
-                    if (form?.code === 'Blank_Form_USD' && oracleInstruments.length === 0) {
+                    if ((form?.code === 'Blank_Form_USD' || form?.code === 'Exchange_Contract_Gold') && oracleInstruments.length === 0) {
                       setLoadingInstruments(true);
                       getOracleInstruments()
                         .then(setOracleInstruments)
@@ -373,8 +385,8 @@ export default function Reports() {
                 />
               </div>
 
-              {/* Инструмент Oracle — только для USD отчёта */}
-              {selectedForm?.code === 'Blank_Form_USD' ? (
+              {/* Инструмент Oracle — для USD и Биржевого контракта золото */}
+              {(selectedForm?.code === 'Blank_Form_USD' || selectedForm?.code === 'Exchange_Contract_Gold') ? (
                 <div className="space-y-1.5 col-span-3">
                   <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                     Инструмент
@@ -396,8 +408,8 @@ export default function Reports() {
                 </div>
               ) : null}
 
-              {/* Класс / Инструмент / Участник — скрываем для USD отчёта */}
-              {selectedForm?.code !== 'Blank_Form_USD' && <>
+              {/* Класс / Инструмент / Участник — скрываем для Oracle-отчётов */}
+              {selectedForm?.code !== 'Blank_Form_USD' && selectedForm?.code !== 'Exchange_Contract_Gold' && <>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                     Класс
@@ -526,7 +538,7 @@ export default function Reports() {
                     </>
                   )}
                 </Button>
-                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows?.length && selectedForm?.code === 'Blank_Form_USD') || (result && selectedForm?.code && FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code))) && (
+                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows?.length && selectedForm?.code === 'Blank_Form_USD') || (goldRows?.length && selectedForm?.code === 'Exchange_Contract_Gold') || (result && selectedForm?.code && FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code))) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
                     Печать
@@ -1161,6 +1173,60 @@ export default function Reports() {
                   </>
                 );
               })()}
+
+              {/* Биржевой контракт золото — данные из Oracle, один документ на сделку */}
+              {selectedForm.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length > 0 && (() => {
+                const perPage = 1;
+                const start = (page - 1) * perPage;
+                const end = isPrinting ? goldRows.length : start + perPage;
+                const paged = goldRows.slice(start, end);
+                const instrumentName = selectedOwnId !== undefined
+                  ? (() => {
+                      const inv = oracleInstruments.find((i) => i.id === selectedOwnId);
+                      return inv ? (inv.extcode ? `${inv.extcode} — ${inv.namerus}` : inv.namerus) : undefined;
+                    })()
+                  : undefined;
+                return (
+                  <>
+                    {paged.map((row, idx) => {
+                      const data: ExchangeContractData = {
+                        id: row.serial,
+                        tradeDate: row.trade_date,
+                        quantity: row.quantity,
+                        price: row.price,
+                        value: row.value,
+                        sellerName: null,
+                        buyerName: null,
+                        sellAccount: null,
+                        buyAccount: null,
+                        sellerClientCode: null,
+                        buyerClientCode: null,
+                        secFullName: instrumentName,
+                        secCode: instrumentName ?? '',
+                      };
+                      return (
+                        <div key={`gold-contract-${row.serial}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
+                          <ExchangeContractReport data={data} contractTitle="Биржевой контракт (золото)" />
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+
+              {selectedForm.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length === 0 && (
+                <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
+                  <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="mb-4 opacity-30">
+                    <rect x="8" y="14" width="40" height="32" rx="4" stroke="currentColor" strokeWidth="2" className="text-muted-foreground" />
+                    <path d="M8 22h40" stroke="currentColor" strokeWidth="2" className="text-muted-foreground" />
+                    <path d="M18 32h6M18 38h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground" />
+                  </svg>
+                  <p className="text-base font-semibold text-foreground">Данные не найдены</p>
+                  <p className="mt-1 text-sm text-muted-foreground max-w-sm">
+                    За выбранный период и параметры фильтрации сделок по золоту не найдено.
+                  </p>
+                </div>
+              )}
 
               {/* Если Auction_Additional_Placement — информация по допразмещению */}
               {(() => {

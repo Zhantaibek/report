@@ -75,3 +75,28 @@ export async function queryOracleUsd(
     volume_usd: Number(r.volume_usd ?? 0),
   }));
 }
+
+export interface GoldContractRow {
+  serial: number;
+  trade_date: string;
+  quantity: number;
+  price: number;
+  value: number;
+}
+
+export async function queryOracleGold(
+  dateFrom: string,
+  dateTo: string,
+  ownId?: number,
+): Promise<GoldContractRow[]> {
+  const effectiveOwnId = ownId ?? config.oracle.ownId;
+  const raw = await runJavaBridge('OracleGoldQuery', [dateFrom, dateTo, String(effectiveOwnId)]);
+  const rows = JSON.parse(raw) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    serial:     Number(r.serial     ?? 0),
+    trade_date: String(r.trade_date ?? ''),
+    quantity:   Number(r.quantity   ?? 0),
+    price:      Number(r.price      ?? 0),
+    value:      Number(r.value      ?? 0),
+  }));
+}

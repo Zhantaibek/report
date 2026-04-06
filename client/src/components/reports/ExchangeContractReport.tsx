@@ -78,7 +78,7 @@ function Gap() {
 const LEGAL_TEXT =
   'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи ценных бумаг в ходе биржевых торгов, организованных ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки купли-продажи и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
 
-function OneContract({ data }: { data: ExchangeContractData }) {
+function OneContract({ data, contractTitle }: { data: ExchangeContractData; contractTitle?: string }) {
   const tradeDate = data.tradeDate ?? '';
   const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
   const couponVal = data.couponRate != null && data.couponRate > 0
@@ -91,7 +91,7 @@ function OneContract({ data }: { data: ExchangeContractData }) {
     <div className="w-full bg-white text-sm leading-normal">
       <KSELogoHeader />
 
-      <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт №{data.id ?? '—'}</h1>
+      <h1 className="text-lg font-bold mb-2 text-center">{contractTitle ?? 'Биржевой контракт'} №{data.id ?? '—'}</h1>
       <p className="text-center text-sm mb-4">
         <span className="text-foreground">Номер сделки: </span>
         <span className="font-semibold text-foreground">{data.id ?? '—'}</span>
@@ -176,12 +176,12 @@ function OneContract({ data }: { data: ExchangeContractData }) {
   );
 }
 
-export function ExchangeContractReport({ data }: { data: ExchangeContractData }) {
+export function ExchangeContractReport({ data, contractTitle }: { data: ExchangeContractData; contractTitle?: string }) {
   return (
     <div className="w-full pb-6 print:max-w-none print:px-0">
-      <OneContract data={data} />
+      <OneContract data={data} contractTitle={contractTitle} />
       <div className="mt-10 pt-8 border-t-2 border-dashed border-gray-300">
-        <OneContract data={data} />
+        <OneContract data={data} contractTitle={contractTitle} />
       </div>
     </div>
   );

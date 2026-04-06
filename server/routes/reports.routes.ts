@@ -5,7 +5,7 @@ import { reportToXlsxBuffer } from '../reports/export/xlsx.js';
 import { reportToCsv } from '../reports/export/csv.js';
 import { getDataSources } from '../config/data-sources.js';
 import { getSecurities, getClasses, getFirms, runCustomSqlQuery } from '../data-sources/index.js';
-import { queryOracleUsd, queryOracleInstruments } from '../data-sources/oracle.js';
+import { queryOracleUsd, queryOracleInstruments, queryOracleGold } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
 import { baseTradesQuery } from '../reports/report-definitions.js';
 
@@ -137,6 +137,24 @@ router.post('/usd', async (req, res) => {
     res.json({ rows });
   } catch (err) {
     console.error('[/api/reports/usd]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
+  }
+});
+
+/**
+ * Биржевой контракт золото: данные из Oracle (ARCTS.DEAL), индивидуальные сделки.
+ */
+router.post('/gold', async (req, res) => {
+  try {
+    const { dateFrom, dateTo, ownId } = req.body ?? {};
+    if (!dateFrom || !dateTo) {
+      res.status(400).json({ error: 'dateFrom and dateTo required' });
+      return;
+    }
+    const rows = await queryOracleGold(dateFrom, dateTo, ownId ? Number(ownId) : undefined);
+    res.json({ rows });
+  } catch (err) {
+    console.error('[/api/reports/gold]', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
   }
 });

@@ -88,6 +88,18 @@ export function runUsdReport(dateFrom: string, dateTo: string, ownId?: number): 
   return api.post('/reports/usd', { dateFrom, dateTo, ownId });
 }
 
+export interface GoldContractRow {
+  serial: number;
+  trade_date: string;
+  quantity: number;
+  price: number;
+  value: number;
+}
+
+export function runGoldReport(dateFrom: string, dateTo: string, ownId?: number): Promise<{ rows: GoldContractRow[] }> {
+  return api.post('/reports/gold', { dateFrom, dateTo, ownId });
+}
+
 export interface TodayTrade {
   id: string;
   tradeDate: string;

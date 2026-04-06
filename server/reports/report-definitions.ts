@@ -651,6 +651,14 @@ export const reportDefinitions: ReportDefinition[] = [
     singleDate: true,
     sql: exchangeContractQuery,
   },
+  {
+    code: 'Exchange_Contract_Gold',
+    name: 'Exchange_Contract_Gold',
+    description: 'Биржевой контракт золото',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+  },
 ];
 
 /**
