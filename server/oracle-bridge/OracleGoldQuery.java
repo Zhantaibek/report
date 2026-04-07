@@ -10,7 +10,8 @@ import java.time.temporal.ChronoUnit;
  *
  * Returns individual gold deal records (one row per trade) from ARCTS.DEAL (архив)
  * и TS.DEAL (текущие сделки до архивации), дедупликация по SERIAL.
- * Fields: serial, trade_date, quantity, price, value
+ * Fields: serial, trade_date, quantity, price, value;
+ * из CURRINSTRUMENT (LEFT JOIN по ci.ID = t.OWNID - 1): issuer_namerus, sec_extcode.
  */
 public class OracleGoldQuery {
 
@@ -45,36 +46,36 @@ public class OracleGoldQuery {
             "  TO_CHAR(dates.dt, 'YYYY-MM-DD')     AS trade_date, " +
             "  t.VOLUME                             AS quantity, " +
             "  CASE WHEN t.VOLUME > 0 THEN t.VOLCONTR / t.VOLUME ELSE 0 END AS price, " +
-            "  t.VOLCONTR                           AS value " +
+            "  t.VOLCONTR                           AS value, " +
+            "  ci.NAMERUS                           AS issuer_namerus, " +
+            "  ci.EXTCODE                           AS sec_extcode " +
             "FROM " +
             "  (SELECT TO_DATE(?, 'YYYY-MM-DD') + ROWNUM - 1 AS dt " +
             "   FROM ARCTS.DEAL " +
             "   WHERE ROWNUM <= " + dayCount + ") dates, " +
-            "  (SELECT x.SERIAL, x.VOLUME, x.VOLCONTR, x.DATE0 " +
+            "  (SELECT x.SERIAL, x.VOLUME, x.VOLCONTR, x.DATE0, x.OWNID " +
             "   FROM ( " +
             "     SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.SERIAL ORDER BY u.DATE0 DESC) AS rn " +
             "     FROM ( " +
-            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
+            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0, t.OWNID " +
             "       FROM ARCTS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "         AND t.OWNID = " + ownId +
             "       UNION ALL " +
-            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
+            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0, t.OWNID " +
             "       FROM TS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "         AND t.OWNID = " + ownId +
             "     ) u " +
             "   ) x " +
-            "   WHERE x.rn = 1) t " +
+            "   WHERE x.rn = 1) t, " +
+            "  CURRINSTRUMENT ci " +
             "WHERE t.DATE0 >= makelongdate(dates.dt) " +
             "  AND t.DATE0 <  makelongdate(dates.dt + 1) " +
+            "  AND ci.ID(+) = t.OWNID - 1 " +
             "ORDER BY t.SERIAL";
-
-        // TODO(временно): убрать после отладки загрузки сделок
-        System.err.println("[OracleGoldQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownIdArg=" + ownIdArg + " ownIdInSql=" + ownId + " dayCount=" + dayCount);
-        System.err.println("[OracleGoldQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
 
         try (Connection conn = DriverManager.getConnection(url, user, password);
              PreparedStatement ps = conn.prepareStatement(sql)) {

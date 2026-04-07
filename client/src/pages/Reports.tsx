@@ -1189,6 +1189,10 @@ export default function Reports() {
                 return (
                   <>
                     {paged.map((row, idx) => {
+                      const ext = row.sec_extcode?.trim();
+                      const issuer = row.issuer_namerus?.trim();
+                      const symbolFromOracle =
+                        ext && issuer ? `${ext} — ${issuer}` : ext || issuer || undefined;
                       const data: ExchangeContractData = {
                         id: row.serial,
                         tradeDate: row.trade_date,
@@ -1201,8 +1205,9 @@ export default function Reports() {
                         buyAccount: null,
                         sellerClientCode: null,
                         buyerClientCode: null,
-                        secFullName: instrumentName,
-                        secCode: instrumentName ?? '',
+                        className: issuer ?? undefined,
+                        secFullName: symbolFromOracle ?? instrumentName,
+                        secCode: ext ?? instrumentName ?? '',
                       };
                       return (
                         <div key={`gold-contract-${row.serial}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>

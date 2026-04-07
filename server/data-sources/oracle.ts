@@ -116,6 +116,10 @@ export interface GoldContractRow {
   quantity: number;
   price: number;
   value: number;
+  /** CURRINSTRUMENT.NAMERUS (эмитент / наименование) */
+  issuer_namerus?: string | null;
+  /** CURRINSTRUMENT.EXTCODE */
+  sec_extcode?: string | null;
 }
 
 export async function queryOracleGold(
@@ -132,5 +136,7 @@ export async function queryOracleGold(
     quantity:   Number(r.quantity   ?? 0),
     price:      Number(r.price      ?? 0),
     value:      Number(r.value      ?? 0),
+    issuer_namerus: r.issuer_namerus != null ? String(r.issuer_namerus) : null,
+    sec_extcode:    r.sec_extcode != null ? String(r.sec_extcode) : null,
   }));
 }

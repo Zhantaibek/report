@@ -94,6 +94,8 @@ export interface GoldContractRow {
   quantity: number;
   price: number;
   value: number;
+  issuer_namerus?: string | null;
+  sec_extcode?: string | null;
 }
 
 export function runGoldReport(dateFrom: string, dateTo: string, ownId?: number): Promise<{ rows: GoldContractRow[] }> {
