@@ -91,12 +91,14 @@ public class OracleGoldQuery {
             "              d1.DATE0, d1.OWNID, " +
             "              d1.USERID, d1.IDTRDACC, " +
             "              d2.USERID AS CPUSERID, d2.IDTRDACC AS CPIDTRDACC " +
-            "       FROM SYS.DEAL1 d1 " +
-            "       LEFT JOIN SYS.DEAL1 d2 ON d2.ID = d1.IDPAIR " +
-            "         AND d2.OWNID = d1.OWNID AND d2.SERIAL = d1.SERIAL AND d2.ID > d1.ID " +
+            "       FROM SYS.DEAL1 d1, SYS.DEAL1 d2 " +
             "       WHERE d1.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "         AND d1.OWNID = " + ownId +
+            "         AND d1.ID < d1.IDPAIR " +
+            "         AND d1.IDPAIR = d2.ID(+) " +
+            "         AND d1.OWNID = d2.OWNID(+) " +
+            "         AND d1.SERIAL = d2.SERIAL(+) " +
             "       UNION ALL " +
             "       SELECT d1.SERIAL, d1.VOLUME, " +
             "              NVL(d1.VOLCONTR, 0) AS VALUE_AMT, " +
@@ -105,12 +107,14 @@ public class OracleGoldQuery {
             "              d1.USERID, d1.IDTRDACC, " +
             "              NVL(d2.USERID, d1.CPUSERID) AS CPUSERID, " +
             "              NVL(d2.IDTRDACC, d1.CPIDTRDACC) AS CPIDTRDACC " +
-            "       FROM TS.DEAL d1 " +
-            "       LEFT JOIN TS.DEAL d2 ON d2.ID = d1.IDPAIR " +
-            "         AND d2.OWNID = d1.OWNID AND d2.SERIAL = d1.SERIAL AND d2.ID > d1.ID " +
+            "       FROM TS.DEAL d1, TS.DEAL d2 " +
             "       WHERE d1.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "         AND d1.OWNID = " + ownId +
+            "         AND d1.ID < d1.IDPAIR " +
+            "         AND d1.IDPAIR = d2.ID(+) " +
+            "         AND d1.OWNID = d2.OWNID(+) " +
+            "         AND d1.SERIAL = d2.SERIAL(+) " +
             "     ) u " +
             "   ) x " +
             "   WHERE x.rn = 1) t, " +
