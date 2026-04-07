@@ -103,7 +103,7 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
 
       <Gap />
 
-      <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)} гр.`} />
+      <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)}`} />
       <Row label="Цена торгового инструмента" value={`${fmtNum(data.price, 2)} с.`} />
       <Row label="Сумма сделки" value={`${fmtNum(data.value, 2)} с.`} />
 
