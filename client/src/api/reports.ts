@@ -94,6 +94,8 @@ export interface GoldContractRow {
   quantity: number;
   price: number;
   value: number;
+  sellerCommission?: number | null;
+  buyerCommission?: number | null;
   issuer_namerus?: string | null;
   sec_extcode?: string | null;
   seller_name?: string | null;

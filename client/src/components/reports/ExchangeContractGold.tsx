@@ -16,6 +16,8 @@ interface ExchangeContractGoldData {
   quantity: number;
   price: number;
   value: number;
+  sellerCommission?: number | null;
+  buyerCommission?: number | null;
   sellerName?: string | null;
   sellerAccount?: string | null;
   sellerTrader?: string | null;
@@ -69,6 +71,8 @@ const LEGAL_TEXT =
   'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи золота в ходе биржевых торгов, организованных ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
 
 function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
+  const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
+  const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
   return (
     <div className="w-full bg-white text-sm leading-normal">
       <KSELogoHeader />
@@ -106,6 +110,8 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
       <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)}`} />
       <Row label="Цена торгового инструмента" value={`${fmtNum(data.price, 2)} с.`} />
       <Row label="Сумма сделки" value={`${fmtNum(data.value, 2)} с.`} />
+      <Row label="Комиссионный сбор с Продавца" value={sellerComm} />
+      <Row label="Комиссионный сбор с Покупателя" value={buyerComm} />
 
       <Gap />
 
@@ -166,6 +172,8 @@ export function ExchangeContractGold({
           quantity: row.quantity,
           price: row.price,
           value: row.value,
+          sellerCommission: row.sellerCommission ?? null,
+          buyerCommission: row.buyerCommission ?? null,
           sellerName: row.seller_name ?? null,
           buyerName: row.buyer_name ?? null,
           sellerAccount: row.sell_account ?? null,

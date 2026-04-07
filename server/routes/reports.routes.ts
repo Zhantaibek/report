@@ -8,6 +8,7 @@ import { getSecurities, getClasses, getFirms, runCustomSqlQuery } from '../data-
 import { queryOracleUsd, queryOracleInstruments, queryOracleGold } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
 import { baseTradesQuery } from '../reports/report-definitions.js';
+import { calculateCommissionForTrade } from '../reports/commission-engine.js';
 
 const router = Router();
 
@@ -163,10 +164,24 @@ router.post('/gold', async (req, res) => {
       ownId !== undefined && ownId !== null && ownId !== ''
         ? Number(ownId)
         : undefined;
-    const rows = await queryOracleGold(
+    const rawRows = await queryOracleGold(
       dateFrom,
       dateTo,
       ownIdNum !== undefined && Number.isFinite(ownIdNum) ? ownIdNum : undefined,
+    );
+    const rows = await Promise.all(
+      rawRows.map(async (row) => {
+        const { sellerCommission, buyerCommission } = await calculateCommissionForTrade({
+          classCode: row.sec_extcode ?? undefined,
+          value: row.value,
+          tradeDate: row.trade_date,
+        });
+        return {
+          ...row,
+          sellerCommission: sellerCommission ?? 0,
+          buyerCommission: buyerCommission ?? 0,
+        };
+      }),
     );
     res.json({ rows });
   } catch (err) {
