@@ -99,7 +99,7 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
       <Gap />
 
       <Row label="Торговый символ инструмента" value={data.instrumentCode || '—'} />
-      <Row label="Товарный инструмент" value={data.instrumentName || '—'} />
+      <Row label="Торговый инструмент" value={data.instrumentName || '—'} />
 
       <Gap />
 
@@ -158,6 +158,7 @@ export function ExchangeContractGold({
         const issuer = row.issuer_namerus?.trim();
         const symbolFromOracle =
           ext && issuer ? `${ext} — ${issuer}` : ext || issuer || undefined;
+        const instrumentLabel = symbolFromOracle?.replace(/^[^—]+—\s*/, '').trim() || undefined;
 
         const data: ExchangeContractGoldData = {
           serial: row.serial,
@@ -172,7 +173,7 @@ export function ExchangeContractGold({
           sellerTrader: row.seller_trader ?? null,
           buyerTrader: row.buyer_trader ?? null,
           instrumentCode: ext ?? instrumentName ?? '',
-          instrumentName: symbolFromOracle ?? instrumentName ?? issuer ?? undefined,
+          instrumentName: instrumentLabel ?? issuer ?? instrumentName ?? undefined,
         };
 
         return (
