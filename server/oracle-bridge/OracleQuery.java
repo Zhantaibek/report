@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit;
  * Output: JSON array to stdout, errors to stderr.
  *
  * Query logic:
- *  - Groups unique deals (deduplicated by SERIAL) from ARCTS.DEAL
+ *  - Уникальные сделки (по SERIAL) из ARCTS.DEAL и TS.DEAL
  *  - Filtered by OWNID and date range using makelongdate()
  *  - Groups by calendar date using ROWNUM trick for Oracle 8i
  *  - Returns: trade_date, deal_count, sec_count, volume_usd (=VOLCONTR)
@@ -53,15 +53,24 @@ public class OracleQuery {
             "  (SELECT TO_DATE(?, 'YYYY-MM-DD') + ROWNUM - 1 AS dt " +
             "   FROM ARCTS.DEAL " +
             "   WHERE ROWNUM <= " + dayCount + ") dates, " +
-            "  (SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
+            "  (SELECT x.SERIAL, x.VOLUME, x.VOLCONTR, x.DATE0 " +
             "   FROM ( " +
-            "     SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.SERIAL ORDER BY t.DATE0 DESC) AS rn " +
-            "     FROM ARCTS.DEAL t " +
-            "     WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "                       AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "       AND t.OWNID = " + ownId +
-            "   ) t " +
-            "   WHERE t.rn = 1) t " +
+            "     SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.SERIAL ORDER BY u.DATE0 DESC) AS rn " +
+            "     FROM ( " +
+            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
+            "       FROM ARCTS.DEAL t " +
+            "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "         AND t.OWNID = " + ownId +
+            "       UNION ALL " +
+            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
+            "       FROM TS.DEAL t " +
+            "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "         AND t.OWNID = " + ownId +
+            "     ) u " +
+            "   ) x " +
+            "   WHERE x.rn = 1) t " +
             "WHERE t.DATE0 >= makelongdate(dates.dt) " +
             "  AND t.DATE0 <  makelongdate(dates.dt + 1) " +
             "GROUP BY dates.dt " +
@@ -72,8 +81,10 @@ public class OracleQuery {
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, dateFrom);  // date series start
-            ps.setString(2, dateFrom);  // BETWEEN start
-            ps.setString(3, dateTo);    // BETWEEN end
+            ps.setString(2, dateFrom);  // BETWEEN ARCTS
+            ps.setString(3, dateTo);
+            ps.setString(4, dateFrom);  // BETWEEN TS
+            ps.setString(5, dateTo);
 
             ResultSet rs = ps.executeQuery();
             ResultSetMetaData meta = rs.getMetaData();
