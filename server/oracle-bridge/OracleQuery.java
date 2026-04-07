@@ -77,6 +77,10 @@ public class OracleQuery {
             "HAVING COUNT(t.SERIAL) > 0 " +
             "ORDER BY dates.dt";
 
+        // TODO(временно): убрать после отладки загрузки сделок
+        System.err.println("[OracleQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownId=" + ownId + " dayCount=" + dayCount);
+        System.err.println("[OracleQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
+
         try (Connection conn = DriverManager.getConnection(url, user, password);
              PreparedStatement ps = conn.prepareStatement(sql)) {
 

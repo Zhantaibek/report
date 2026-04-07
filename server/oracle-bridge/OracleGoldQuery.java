@@ -71,6 +71,10 @@ public class OracleGoldQuery {
             "  AND t.DATE0 <  makelongdate(dates.dt + 1) " +
             "ORDER BY t.SERIAL";
 
+        // TODO(временно): убрать после отладки загрузки сделок
+        System.err.println("[OracleGoldQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownId=" + ownId + " dayCount=" + dayCount);
+        System.err.println("[OracleGoldQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
+
         try (Connection conn = DriverManager.getConnection(url, user, password);
              PreparedStatement ps = conn.prepareStatement(sql)) {
 

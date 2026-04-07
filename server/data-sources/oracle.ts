@@ -39,6 +39,11 @@ function runJavaBridge(className: string, args: string[]): Promise<string> {
     });
     const cp = [BRIDGE_DIR, OJDBC_JAR].join(path.delimiter);
     const baseArgs = [host, String(port), sid, user, password, ...args];
+    // TODO(временно): убрать после отладки
+    const logArgs = [...baseArgs];
+    logArgs[3] = '***';
+    logArgs[4] = '***';
+    console.log('[oracle-jdbc DEBUG]', className, 'args:', logArgs);
 
     execFile(
       JAVA_BIN,
