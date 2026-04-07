@@ -26,8 +26,9 @@ public class OracleGoldQuery {
         String password = args[4];
         String dateFrom = args[5];
         String dateTo   = args[6];
-        // Значение = ARCTS.DEAL.OWNID (как ID в CURRINSTRUMENT), без сдвига.
-        long   ownId    = args.length > 7 ? Long.parseLong(args[7]) : 8853817L;
+        // Параметр с API = ID из CURRINSTRUMENT; в ARCTS.DEAL / TS.DEAL фильтр OWNID = значение + 1.
+        long   ownIdArg = args.length > 7 ? Long.parseLong(args[7]) : 8853816L;
+        long   ownId    = ownIdArg + 1;
 
         LocalDate dFrom = LocalDate.parse(dateFrom);
         LocalDate dTo   = LocalDate.parse(dateTo);
@@ -72,7 +73,7 @@ public class OracleGoldQuery {
             "ORDER BY t.SERIAL";
 
         // TODO(временно): убрать после отладки загрузки сделок
-        System.err.println("[OracleGoldQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownId=" + ownId + " dayCount=" + dayCount);
+        System.err.println("[OracleGoldQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownIdArg=" + ownIdArg + " ownIdInSql=" + ownId + " dayCount=" + dayCount);
         System.err.println("[OracleGoldQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
 
         try (Connection conn = DriverManager.getConnection(url, user, password);

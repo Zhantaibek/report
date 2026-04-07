@@ -44,8 +44,7 @@ export const config = {
     serviceName: process.env.ORACLE_DB_NAME ?? '',
     user: process.env.ORACLE_DB_USER ?? '',
     password: process.env.ORACLE_DB_PASSWORD ?? '',
-    // ARCTS.DEAL.OWNID при отчёте «все инструменты». Раньше в Java к значению добавляли +1;
-    // если в .env было 8853816, укажите здесь 8853817.
-    ownId: parseInt(process.env.ORACLE_DB_OWNID ?? '8853817', 10),
+    // ID инструмента для «все инструменты» (как в CURRINSTRUMENT); в Java к нему +1 для OWNID в DEAL.
+    ownId: parseInt(process.env.ORACLE_DB_OWNID ?? '8853816', 10),
   },
 };

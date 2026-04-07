@@ -28,8 +28,9 @@ public class OracleQuery {
         String password = args[4];
         String dateFrom = args[5];
         String dateTo   = args[6];
-        // Значение = ARCTS.DEAL.OWNID (как ID в CURRINSTRUMENT), без сдвига.
-        long   ownId    = args.length > 7 ? Long.parseLong(args[7]) : 8853817L;
+        // Параметр с API = ID из CURRINSTRUMENT; в ARCTS.DEAL / TS.DEAL фильтр OWNID = значение + 1.
+        long   ownIdArg = args.length > 7 ? Long.parseLong(args[7]) : 8853816L;
+        long   ownId    = ownIdArg + 1;
 
         // Number of calendar days in range (used for ROWNUM-based date series)
         LocalDate dFrom = LocalDate.parse(dateFrom);
@@ -78,7 +79,7 @@ public class OracleQuery {
             "ORDER BY dates.dt";
 
         // TODO(временно): убрать после отладки загрузки сделок
-        System.err.println("[OracleQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownId=" + ownId + " dayCount=" + dayCount);
+        System.err.println("[OracleQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownIdArg=" + ownIdArg + " ownIdInSql=" + ownId + " dayCount=" + dayCount);
         System.err.println("[OracleQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
 
         try (Connection conn = DriverManager.getConnection(url, user, password);
