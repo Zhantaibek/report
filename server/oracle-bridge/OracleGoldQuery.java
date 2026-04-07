@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
  * Инструмент: TS.TS_CURRINSTRUMENT_ARCTS ci при ci.DEALS_ID = t.OWNID (как в вашем SELECT);
  * имена — NAMERUS/EXTCODE с ci. Параметр API = ID из CURRINSTRUMENT;
  * фильтр t.OWNID = значение + 1 (как для DEAL.OWNID).
- * Стороны: USERID/IDTRDACC и CPUSERID/CPIDTRDACC (+ TS.*). Если на SYS.DEAL1 нет CP* — покупатель будет null.
+ * Стороны: USERID/IDTRDACC (+ TS.*); контрагент из CP* только из TS.DEAL; в SYS.DEAL1 CP* нет — NULL в UNION.
  */
 public class OracleGoldQuery {
 
@@ -65,10 +65,10 @@ public class OracleGoldQuery {
             "  t.VALUE_AMT                          AS value, " +
             "  o_sel.NAME                           AS seller_name, " +
             "  ta_sel.CODE                          AS sell_account, " +
-            "  ut_sel.Name                          AS seller_trader, " +
+            "  ut_sel.NAME                          AS seller_trader, " +
             "  o_buy.NAME                           AS buyer_name, " +
             "  ta_buy.CODE                          AS buy_account, " +
-            "  ut_buy.Name                          AS buyer_trader, " +
+            "  ut_buy.NAME                          AS buyer_trader, " +
             "  ci.NAMERUS                           AS issuer_namerus, " +
             "  ci.EXTCODE                           AS sec_extcode " +
             "FROM " +
@@ -84,7 +84,8 @@ public class OracleGoldQuery {
             "              NVL(t.PRICE, 0) * NVL(t.VOLUME, 0) AS VALUE_AMT, " +
             "              NVL(t.PRICE, 0) AS UNIT_PRICE, " +
             "              t.DATE0, t.OWNID, " +
-            "              t.USERID, t.IDTRDACC, t.CPUSERID, t.CPIDTRDACC " +
+            "              t.USERID, t.IDTRDACC, " +
+            "              CAST(NULL AS NUMBER) AS CPUSERID, CAST(NULL AS NUMBER) AS CPIDTRDACC " +
             "       FROM SYS.DEAL1 t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
