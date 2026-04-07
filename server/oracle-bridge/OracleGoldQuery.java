@@ -13,17 +13,22 @@ import java.nio.charset.StandardCharsets;
  * Инструмент: TS.TS_CURRINSTRUMENT_ARCTS ci при ci.DEALS_ID = t.OWNID (как в вашем SELECT);
  * имена — NAMERUS/EXTCODE с ci. Параметр API = ID из CURRINSTRUMENT;
  * фильтр t.OWNID = значение + 1 (как для DEAL.OWNID).
- * Стороны: USERID/IDTRDACC (+ TS.*); контрагент из CP* только из TS.DEAL; в SYS.DEAL1 CP* нет — NULL в UNION.
+ * Стороны: в SYS.DEAL1/TS.DEAL две строки на SERIAL, связь d2.ID = d1.IDPAIR; берём d1 с меньшим ID как одну сторону,
+ * d2 как другую (seller/buyer). В TS.DEAL при отсутствии пары — fallback на CPUSERID/CPIDTRDACC.
  */
 public class OracleGoldQuery {
 
     static String stringFromOracleBytes(ResultSet rs, int colIdx) throws SQLException {
         byte[] bytes = rs.getBytes(colIdx);
         if (bytes == null) return null;
+        String utf8 = new String(bytes, StandardCharsets.UTF_8).trim();
+        if (!utf8.contains("\uFFFD")) {
+            return utf8;
+        }
         try {
             return new String(bytes, "Cp1251").trim();
         } catch (Exception e) {
-            return new String(bytes, StandardCharsets.UTF_8).trim();
+            return utf8;
         }
     }
 
@@ -80,26 +85,32 @@ public class OracleGoldQuery {
             "   FROM ( " +
             "     SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.SERIAL ORDER BY u.DATE0 DESC) AS rn " +
             "     FROM ( " +
-            "       SELECT t.SERIAL, t.VOLUME, " +
-            "              NVL(t.PRICE, 0) * NVL(t.VOLUME, 0) AS VALUE_AMT, " +
-            "              NVL(t.PRICE, 0) AS UNIT_PRICE, " +
-            "              t.DATE0, t.OWNID, " +
-            "              t.USERID, t.IDTRDACC, " +
-            "              CAST(NULL AS NUMBER) AS CPUSERID, CAST(NULL AS NUMBER) AS CPIDTRDACC " +
-            "       FROM SYS.DEAL1 t " +
-            "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "       SELECT d1.SERIAL, d1.VOLUME, " +
+            "              NVL(d1.PRICE, 0) * NVL(d1.VOLUME, 0) AS VALUE_AMT, " +
+            "              NVL(d1.PRICE, 0) AS UNIT_PRICE, " +
+            "              d1.DATE0, d1.OWNID, " +
+            "              d1.USERID, d1.IDTRDACC, " +
+            "              d2.USERID AS CPUSERID, d2.IDTRDACC AS CPIDTRDACC " +
+            "       FROM SYS.DEAL1 d1 " +
+            "       LEFT JOIN SYS.DEAL1 d2 ON d2.ID = d1.IDPAIR " +
+            "         AND d2.OWNID = d1.OWNID AND d2.SERIAL = d1.SERIAL AND d2.ID > d1.ID " +
+            "       WHERE d1.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND t.OWNID = " + ownId +
+            "         AND d1.OWNID = " + ownId +
             "       UNION ALL " +
-            "       SELECT t.SERIAL, t.VOLUME, " +
-            "              NVL(t.VOLCONTR, 0) AS VALUE_AMT, " +
-            "              CASE WHEN t.VOLUME > 0 THEN NVL(t.VOLCONTR, 0) / t.VOLUME ELSE 0 END AS UNIT_PRICE, " +
-            "              t.DATE0, t.OWNID, " +
-            "              t.USERID, t.IDTRDACC, t.CPUSERID, t.CPIDTRDACC " +
-            "       FROM TS.DEAL t " +
-            "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
+            "       SELECT d1.SERIAL, d1.VOLUME, " +
+            "              NVL(d1.VOLCONTR, 0) AS VALUE_AMT, " +
+            "              CASE WHEN d1.VOLUME > 0 THEN NVL(d1.VOLCONTR, 0) / d1.VOLUME ELSE 0 END AS UNIT_PRICE, " +
+            "              d1.DATE0, d1.OWNID, " +
+            "              d1.USERID, d1.IDTRDACC, " +
+            "              NVL(d2.USERID, d1.CPUSERID) AS CPUSERID, " +
+            "              NVL(d2.IDTRDACC, d1.CPIDTRDACC) AS CPIDTRDACC " +
+            "       FROM TS.DEAL d1 " +
+            "       LEFT JOIN TS.DEAL d2 ON d2.ID = d1.IDPAIR " +
+            "         AND d2.OWNID = d1.OWNID AND d2.SERIAL = d1.SERIAL AND d2.ID > d1.ID " +
+            "       WHERE d1.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND t.OWNID = " + ownId +
+            "         AND d1.OWNID = " + ownId +
             "     ) u " +
             "   ) x " +
             "   WHERE x.rn = 1) t, " +
