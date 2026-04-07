@@ -73,19 +73,16 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
     <div className="w-full bg-white text-sm leading-normal">
       <KSELogoHeader />
 
-      <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт (золото) №{data.serial ?? '—'} </h1>
-      <i>(в редакции решений Совета директоров ЗАО «КФБ» от 13 марта 2026 года)</i>
+      <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт №{data.serial ?? '—'} </h1>
+      <p className="text-center text-sm italic mb-1">
+        (в редакции решений Совета директоров ЗАО «КФБ» от 13 марта 2026 года)
+      </p>
       <p className="text-center text-sm mb-4">
         <span className="text-foreground">Номер сделки: </span>
         <span className="font-semibold text-foreground">{data.serial ?? '—'}</span>
       </p>
 
-      <Row2
-        label1="Дата заключения сделки"
-        value1={fmtDate(data.tradeDate)}
-        label2="Актив"
-        value2="Золото"
-      />
+      <Row label="Дата заключения сделки" value={fmtDate(data.tradeDate)} />
 
       <Gap />
 
@@ -106,16 +103,9 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
 
       <Gap />
 
-      <Row2
-        label1="Количество торгового инструмента"
-        value1={`${fmtNum(data.quantity, 2)} гр.`}
-        label2="Цена торгового инструмента"
-        value2={`${fmtNum(data.price, 2)} с.`}
-      />
-      <Row
-        label="Сумма сделки"
-        value={`${fmtNum(data.value, 2)} с.`}
-      />
+      <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)} гр.`} />
+      <Row label="Цена торгового инструмента" value={`${fmtNum(data.price, 2)} с.`} />
+      <Row label="Сумма сделки" value={`${fmtNum(data.value, 2)} с.`} />
 
       <Gap />
 
