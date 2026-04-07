@@ -34,6 +34,7 @@ import { Form6Report, type ReportForm6Data, type Form6Row } from '../components/
 import { Form8Report, type ReportForm8Data, type Form8Row } from '../components/reports/Form8Report.tsx';
 import { Form7Report, type ReportForm7Data, type Form7Row } from '../components/reports/Form7Report.tsx';
 import { UsdReport } from '../components/reports/UsdReport.tsx';
+import { ExchangeContractGold } from '../components/reports/ExchangeContractGold.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 import { DateInput } from '../components/ui/date-input.tsx';
 import { Alert, AlertDescription } from '../components/ui/alert.tsx';
@@ -1176,46 +1177,14 @@ export default function Reports() {
 
               {/* Биржевой контракт золото — данные из Oracle, один документ на сделку */}
               {selectedForm.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length > 0 && (() => {
-                const perPage = 1;
-                const start = (page - 1) * perPage;
-                const end = isPrinting ? goldRows.length : start + perPage;
-                const paged = goldRows.slice(start, end);
-                const instrumentName = selectedOwnId !== undefined
-                  ? (() => {
-                      const inv = oracleInstruments.find((i) => i.id === selectedOwnId);
-                      return inv ? (inv.extcode ? `${inv.extcode} — ${inv.namerus}` : inv.namerus) : undefined;
-                    })()
-                  : undefined;
                 return (
-                  <>
-                    {paged.map((row, idx) => {
-                      const ext = row.sec_extcode?.trim();
-                      const issuer = row.issuer_namerus?.trim();
-                      const symbolFromOracle =
-                        ext && issuer ? `${ext} — ${issuer}` : ext || issuer || undefined;
-                      const data: ExchangeContractData = {
-                        id: row.serial,
-                        tradeDate: row.trade_date,
-                        quantity: row.quantity,
-                        price: row.price,
-                        value: row.value,
-                        sellerName: row.seller_name ?? null,
-                        buyerName: row.buyer_name ?? null,
-                        sellAccount: row.sell_account ?? null,
-                        buyAccount: row.buy_account ?? null,
-                        sellerClientCode: row.seller_trader ?? null,
-                        buyerClientCode: row.buyer_trader ?? null,
-                        className: issuer ?? undefined,
-                        secFullName: symbolFromOracle ?? instrumentName,
-                        secCode: ext ?? instrumentName ?? '',
-                      };
-                      return (
-                        <div key={`gold-contract-${row.serial}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
-                          <ExchangeContractReport data={data} contractTitle="Биржевой контракт (золото)" />
-                        </div>
-                      );
-                    })}
-                  </>
+                  <ExchangeContractGold
+                    rows={goldRows}
+                    page={page}
+                    isPrinting={isPrinting}
+                    selectedOwnId={selectedOwnId}
+                    oracleInstruments={oracleInstruments}
+                  />
                 );
               })()}
 
