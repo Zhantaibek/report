@@ -120,6 +120,12 @@ export interface GoldContractRow {
   issuer_namerus?: string | null;
   /** CURRINSTRUMENT.EXTCODE */
   sec_extcode?: string | null;
+  seller_name?: string | null;
+  sell_account?: string | null;
+  seller_trader?: string | null;
+  buyer_name?: string | null;
+  buy_account?: string | null;
+  buyer_trader?: string | null;
 }
 
 export async function queryOracleGold(
@@ -138,5 +144,11 @@ export async function queryOracleGold(
     value:      Number(r.value      ?? 0),
     issuer_namerus: r.issuer_namerus != null ? String(r.issuer_namerus) : null,
     sec_extcode:    r.sec_extcode != null ? String(r.sec_extcode) : null,
+    seller_name:    r.seller_name != null ? String(r.seller_name) : null,
+    sell_account:   r.sell_account != null ? String(r.sell_account) : null,
+    seller_trader:  r.seller_trader != null ? String(r.seller_trader) : null,
+    buyer_name:     r.buyer_name != null ? String(r.buyer_name) : null,
+    buy_account:    r.buy_account != null ? String(r.buy_account) : null,
+    buyer_trader:   r.buyer_trader != null ? String(r.buyer_trader) : null,
   }));
 }

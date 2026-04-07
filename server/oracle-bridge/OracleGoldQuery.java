@@ -1,6 +1,7 @@
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Oracle JDBC query bridge for Gold Contract report.
@@ -8,12 +9,30 @@ import java.time.temporal.ChronoUnit;
  * Dates format: YYYY-MM-DD
  * Output: JSON array to stdout, errors to stderr.
  *
- * Returns individual gold deal records (one row per trade) from ARCTS.DEAL (архив)
- * и TS.DEAL (текущие сделки до архивации), дедупликация по SERIAL.
- * Fields: serial, trade_date, quantity, price, value;
- * из CURRINSTRUMENT (LEFT JOIN по ci.ID = t.OWNID - 1): issuer_namerus, sec_extcode.
+ * Сделки: SYS.DEAL1 (архив) + TS.DEAL, дедуп по SERIAL.
+ * Инструмент: TS.TS_CURRINSTRUMENT_ARCTS ci при ci.DEALS_ID = t.OWNID (как в вашем SELECT);
+ * имена — NAMERUS/EXTCODE с ci. Параметр API = ID из CURRINSTRUMENT;
+ * фильтр t.OWNID = значение + 1 (как для DEAL.OWNID).
+ * Стороны: USERID/IDTRDACC и CPUSERID/CPIDTRDACC (+ TS.*). Если на SYS.DEAL1 нет CP* — покупатель будет null.
  */
 public class OracleGoldQuery {
+
+    static String stringFromOracleBytes(ResultSet rs, int colIdx) throws SQLException {
+        byte[] bytes = rs.getBytes(colIdx);
+        if (bytes == null) return null;
+        try {
+            return new String(bytes, "Cp1251").trim();
+        } catch (Exception e) {
+            return new String(bytes, StandardCharsets.UTF_8).trim();
+        }
+    }
+
+    static String jsonEscape(String s) {
+        return s.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
+    }
 
     public static void main(String[] args) throws Exception {
         if (args.length < 7) {
@@ -27,7 +46,6 @@ public class OracleGoldQuery {
         String password = args[4];
         String dateFrom = args[5];
         String dateTo   = args[6];
-        // Параметр с API = ID из CURRINSTRUMENT; в ARCTS.DEAL / TS.DEAL фильтр OWNID = значение + 1.
         long   ownIdArg = args.length > 7 ? Long.parseLong(args[7]) : 8853816L;
         long   ownId    = ownIdArg + 1;
 
@@ -38,32 +56,45 @@ public class OracleGoldQuery {
         String url = "jdbc:oracle:thin:@" + host + ":" + port + ":" + sid;
         Class.forName("oracle.jdbc.driver.OracleDriver");
 
-        // Returns individual deduplicated deal rows joined to the date series.
-        // Uses the same ROWNUM trick as OracleQuery for Oracle 8i compatibility.
         String sql =
             "SELECT " +
             "  t.SERIAL                             AS serial, " +
             "  TO_CHAR(dates.dt, 'YYYY-MM-DD')     AS trade_date, " +
             "  t.VOLUME                             AS quantity, " +
-            "  CASE WHEN t.VOLUME > 0 THEN t.VOLCONTR / t.VOLUME ELSE 0 END AS price, " +
-            "  t.VOLCONTR                           AS value, " +
+            "  CASE WHEN t.VOLUME > 0 THEN t.VALUE_AMT / t.VOLUME ELSE NVL(t.UNIT_PRICE, 0) END AS price, " +
+            "  t.VALUE_AMT                          AS value, " +
+            "  o_sel.NAME                           AS seller_name, " +
+            "  ta_sel.CODE                          AS sell_account, " +
+            "  ut_sel.Name                          AS seller_trader, " +
+            "  o_buy.NAME                           AS buyer_name, " +
+            "  ta_buy.CODE                          AS buy_account, " +
+            "  ut_buy.Name                          AS buyer_trader, " +
             "  ci.NAMERUS                           AS issuer_namerus, " +
             "  ci.EXTCODE                           AS sec_extcode " +
             "FROM " +
             "  (SELECT TO_DATE(?, 'YYYY-MM-DD') + ROWNUM - 1 AS dt " +
-            "   FROM ARCTS.DEAL " +
+            "   FROM SYS.DEAL1 " +
             "   WHERE ROWNUM <= " + dayCount + ") dates, " +
-            "  (SELECT x.SERIAL, x.VOLUME, x.VOLCONTR, x.DATE0, x.OWNID " +
+            "  (SELECT x.SERIAL, x.VOLUME, x.VALUE_AMT, x.UNIT_PRICE, x.DATE0, x.OWNID, " +
+            "          x.USERID, x.IDTRDACC, x.CPUSERID, x.CPIDTRDACC " +
             "   FROM ( " +
             "     SELECT u.*, ROW_NUMBER() OVER (PARTITION BY u.SERIAL ORDER BY u.DATE0 DESC) AS rn " +
             "     FROM ( " +
-            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0, t.OWNID " +
-            "       FROM ARCTS.DEAL t " +
+            "       SELECT t.SERIAL, t.VOLUME, " +
+            "              NVL(t.PRICE, 0) * NVL(t.VOLUME, 0) AS VALUE_AMT, " +
+            "              NVL(t.PRICE, 0) AS UNIT_PRICE, " +
+            "              t.DATE0, t.OWNID, " +
+            "              t.USERID, t.IDTRDACC, t.CPUSERID, t.CPIDTRDACC " +
+            "       FROM SYS.DEAL1 t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "         AND t.OWNID = " + ownId +
             "       UNION ALL " +
-            "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0, t.OWNID " +
+            "       SELECT t.SERIAL, t.VOLUME, " +
+            "              NVL(t.VOLCONTR, 0) AS VALUE_AMT, " +
+            "              CASE WHEN t.VOLUME > 0 THEN NVL(t.VOLCONTR, 0) / t.VOLUME ELSE 0 END AS UNIT_PRICE, " +
+            "              t.DATE0, t.OWNID, " +
+            "              t.USERID, t.IDTRDACC, t.CPUSERID, t.CPIDTRDACC " +
             "       FROM TS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
@@ -71,10 +102,26 @@ public class OracleGoldQuery {
             "     ) u " +
             "   ) x " +
             "   WHERE x.rn = 1) t, " +
-            "  CURRINSTRUMENT ci " +
+            "  TS.TS_CURRINSTRUMENT_ARCTS ci, " +
+            "  TS.USERTRADER ut_sel, " +
+            "  TS.FIRM f_sel, " +
+            "  TS.ORGANIZATION o_sel, " +
+            "  TS.TRADEACCOUNT ta_sel, " +
+            "  TS.USERTRADER ut_buy, " +
+            "  TS.FIRM f_buy, " +
+            "  TS.ORGANIZATION o_buy, " +
+            "  TS.TRADEACCOUNT ta_buy " +
             "WHERE t.DATE0 >= makelongdate(dates.dt) " +
             "  AND t.DATE0 <  makelongdate(dates.dt + 1) " +
-            "  AND ci.ID(+) = t.OWNID - 1 " +
+            "  AND ci.DEALS_ID(+) = t.OWNID " +
+            "  AND ut_sel.ID(+) = t.USERID " +
+            "  AND f_sel.ID(+) = ut_sel.IDFIRM " +
+            "  AND o_sel.ID(+) = f_sel.IDORGAN " +
+            "  AND ta_sel.ID(+) = t.IDTRDACC " +
+            "  AND ut_buy.ID(+) = t.CPUSERID " +
+            "  AND f_buy.ID(+) = ut_buy.IDFIRM " +
+            "  AND o_buy.ID(+) = f_buy.IDORGAN " +
+            "  AND ta_buy.ID(+) = t.CPIDTRDACC " +
             "ORDER BY t.SERIAL";
 
         try (Connection conn = DriverManager.getConnection(url, user, password);
@@ -98,26 +145,31 @@ public class OracleGoldQuery {
                 sb.append("{");
                 for (int i = 1; i <= cols; i++) {
                     if (i > 1) sb.append(",");
-                    String col = meta.getColumnName(i).toLowerCase();
-                    Object val = rs.getObject(i);
+                    String col = meta.getColumnLabel(i).toLowerCase();
                     sb.append("\"").append(col).append("\":");
-                    if (val == null) {
-                        sb.append("null");
-                    } else if (val instanceof Number) {
-                        sb.append(val.toString());
+                    if (col.equals("serial") || col.equals("quantity") || col.equals("price") || col.equals("value")) {
+                        Object val = rs.getObject(i);
+                        if (val == null) {
+                            sb.append("null");
+                        } else if (val instanceof Number) {
+                            sb.append(val.toString());
+                        } else {
+                            sb.append(val.toString());
+                        }
                     } else {
-                        String s = val.toString()
-                            .replace("\\", "\\\\")
-                            .replace("\"", "\\\"")
-                            .replace("\n", "\\n")
-                            .replace("\r", "\\r");
-                        sb.append("\"").append(s).append("\"");
+                        String s = stringFromOracleBytes(rs, i);
+                        if (s == null || s.isEmpty()) {
+                            sb.append("null");
+                        } else {
+                            sb.append("\"").append(jsonEscape(s)).append("\"");
+                        }
                     }
                 }
                 sb.append("}");
             }
             sb.append("]");
-            System.out.println(sb.toString());
+            System.out.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            System.out.println();
         }
     }
 }

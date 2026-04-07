@@ -96,6 +96,12 @@ export interface GoldContractRow {
   value: number;
   issuer_namerus?: string | null;
   sec_extcode?: string | null;
+  seller_name?: string | null;
+  sell_account?: string | null;
+  seller_trader?: string | null;
+  buyer_name?: string | null;
+  buy_account?: string | null;
+  buyer_trader?: string | null;
 }
 
 export function runGoldReport(dateFrom: string, dateTo: string, ownId?: number): Promise<{ rows: GoldContractRow[] }> {
