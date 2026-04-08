@@ -275,13 +275,14 @@ function SelectWithSearch({
       {open && (
         <div
           ref={listRef}
-          className="absolute z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md"
+          className="absolute z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md max-w-full"
           style={{
             maxHeight: '18rem',
             display: 'flex',
             flexDirection: 'column',
-            minWidth: 'min(42rem, 100vw - 2rem)',
-            width: 'min(42rem, 100vw - 2rem)',
+            width: '100%',
+            minWidth: '100%',
+            maxWidth: 'min(42rem, calc(100vw - 2rem))',
           }}
         >
           {/* Search input */}
@@ -322,7 +323,7 @@ function SelectWithSearch({
                   <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
                     {selected && <Check className="h-4 w-4" />}
                   </span>
-                  <span>{opt.label}</span>
+                  <span className="block min-w-0 truncate">{opt.label}</span>
                 </div>
               );
             })}
@@ -348,7 +349,7 @@ function SelectWithSearch({
                       <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
                         {selected && <Check className="h-4 w-4" />}
                       </span>
-                      <span>{opt.label}</span>
+                      <span className="block min-w-0 truncate">{opt.label}</span>
                     </div>
                   );
                 })}

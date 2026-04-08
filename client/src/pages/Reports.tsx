@@ -35,6 +35,7 @@ import { Form8Report, type ReportForm8Data, type Form8Row } from '../components/
 import { Form7Report, type ReportForm7Data, type Form7Row } from '../components/reports/Form7Report.tsx';
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ExchangeContractGold } from '../components/reports/ExchangeContractGold.tsx';
+import { GoldDailySummaryReport } from '../components/reports/GoldDailySummaryReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 import { DateInput } from '../components/ui/date-input.tsx';
 import { Alert, AlertDescription } from '../components/ui/alert.tsx';
@@ -69,6 +70,7 @@ const FORM_META: Record<string, FormMeta> = {
   Exchange_Contract: { customView: true },
   Exchange_Certificate: { customView: true },
   Exchange_Contract_Gold: { customView: true },
+  Gold_Daily_Summary: { customView: true },
 };
 
 /** Формы с кастомным отображением (не таблица по умолчанию); для них доступна печать. */
@@ -77,6 +79,9 @@ const FORMS_WITH_CUSTOM_VIEW = new Set(
     .filter(([, meta]) => meta.customView)
     .map(([code]) => code),
 );
+
+/** Золото из Oracle: `runGoldReport` и фильтр по инструменту (OWNID). */
+const GOLD_ORACLE_REPORT_CODES = new Set(['Exchange_Contract_Gold', 'Gold_Daily_Summary']);
 
 function paginate<T>(
   rows: T[],
@@ -185,7 +190,7 @@ export default function Reports() {
         const res = await runUsdReport(filters.dateFrom, filters.dateTo, selectedOwnId);
         setUsdRows(res.rows);
         setResult(null);
-      } else if (selectedForm?.code === 'Exchange_Contract_Gold') {
+      } else if (selectedForm && GOLD_ORACLE_REPORT_CODES.has(selectedForm.code)) {
         const res = await runGoldReport(filters.dateFrom, filters.dateTo, selectedOwnId);
         setGoldRows(res.rows);
         setResult(null);
@@ -284,6 +289,9 @@ export default function Reports() {
 
   // Общая пагинация для всех отчётов — один расчёт для верхнего и нижнего блока
   const paginationInfo = useMemo(() => {
+    if (selectedForm?.code === 'Gold_Daily_Summary' && goldRows !== null && goldRows.length > 0) {
+      return { totalRecords: 1, totalPages: 1 };
+    }
     if (selectedForm?.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length > 0) {
       return { totalRecords: goldRows.length, totalPages: goldRows.length };
     }
@@ -363,7 +371,7 @@ export default function Reports() {
                     setSelectedOwnId(undefined);
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
-                    if ((form?.code === 'Blank_Form_USD' || form?.code === 'Exchange_Contract_Gold') && oracleInstruments.length === 0) {
+                    if ((form?.code === 'Blank_Form_USD' || GOLD_ORACLE_REPORT_CODES.has(form?.code ?? '')) && oracleInstruments.length === 0) {
                       setLoadingInstruments(true);
                       getOracleInstruments()
                         .then(setOracleInstruments)
@@ -387,7 +395,7 @@ export default function Reports() {
               </div>
 
               {/* Инструмент Oracle — для USD и Биржевого контракта золото */}
-              {(selectedForm?.code === 'Blank_Form_USD' || selectedForm?.code === 'Exchange_Contract_Gold') ? (
+              {(selectedForm?.code === 'Blank_Form_USD' || GOLD_ORACLE_REPORT_CODES.has(selectedForm?.code ?? '')) ? (
                 <div className="space-y-1.5 col-span-3">
                   <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                     Инструмент
@@ -410,7 +418,7 @@ export default function Reports() {
               ) : null}
 
               {/* Класс / Инструмент / Участник — скрываем для Oracle-отчётов */}
-              {selectedForm?.code !== 'Blank_Form_USD' && selectedForm?.code !== 'Exchange_Contract_Gold' && <>
+              {selectedForm?.code !== 'Blank_Form_USD' && !GOLD_ORACLE_REPORT_CODES.has(selectedForm?.code ?? '') && <>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                     Класс
@@ -539,7 +547,7 @@ export default function Reports() {
                     </>
                   )}
                 </Button>
-                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows?.length && selectedForm?.code === 'Blank_Form_USD') || (goldRows?.length && selectedForm?.code === 'Exchange_Contract_Gold') || (result && selectedForm?.code && FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code))) && (
+                {((groupedResult && selectedForm?.code === 'Blank_Form_1') || (usdRows?.length && selectedForm?.code === 'Blank_Form_USD') || (goldRows?.length && GOLD_ORACLE_REPORT_CODES.has(selectedForm?.code ?? '')) || (result && selectedForm?.code && FORMS_WITH_CUSTOM_VIEW.has(selectedForm.code))) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
                     Печать
@@ -1188,7 +1196,7 @@ export default function Reports() {
                 );
               })()}
 
-              {selectedForm.code === 'Exchange_Contract_Gold' && goldRows !== null && goldRows.length === 0 && (
+              {GOLD_ORACLE_REPORT_CODES.has(selectedForm.code) && goldRows !== null && goldRows.length === 0 && (
                 <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
                   <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="mb-4 opacity-30">
                     <rect x="8" y="14" width="40" height="32" rx="4" stroke="currentColor" strokeWidth="2" className="text-muted-foreground" />
@@ -1201,6 +1209,23 @@ export default function Reports() {
                   </p>
                 </div>
               )}
+
+              {selectedForm.code === 'Gold_Daily_Summary' && goldRows !== null && goldRows.length > 0 && (() => {
+                const instrumentLabel =
+                  selectedOwnId !== undefined
+                    ? (() => {
+                        const inv = oracleInstruments.find((i) => i.id === selectedOwnId);
+                        return inv ? (inv.extcode ? `${inv.extcode} — ${inv.namerus}` : inv.namerus) : undefined;
+                      })()
+                    : undefined;
+                return (
+                  <GoldDailySummaryReport
+                    rows={goldRows}
+                    reportDate={filters.dateFrom ?? ''}
+                    instrumentLabel={instrumentLabel}
+                  />
+                );
+              })()}
 
               {/* Если Auction_Additional_Placement — информация по допразмещению */}
               {(() => {

@@ -20,7 +20,7 @@ export function Modal({ open, onClose, title, children, closeOnBackdropClick = f
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div
-        className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
+        className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {title && (

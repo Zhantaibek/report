@@ -659,6 +659,14 @@ export const reportDefinitions: ReportDefinition[] = [
     category: 'Юридические документы',
     singleDate: true,
   },
+  {
+    code: 'Gold_Daily_Summary',
+    name: 'Gold_Daily_Summary',
+    description: 'Сводный отчёт дня по сделкам с золотом (по номиналам)',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+  },
 ];
 
 /**
