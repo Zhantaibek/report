@@ -51,6 +51,24 @@ export async function upsertCurrencyRate(
   );
 }
 
+/** Обновление курса по id */
+export async function updateCurrencyRateById(
+  id: number,
+  currencyCode: string,
+  rate: number,
+  rateDate: string
+): Promise<void> {
+  await getDb().query(
+    `UPDATE currency_rates SET currency_code = $1, rate = $2, rate_date = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+    [currencyCode, rate, rateDate, id]
+  );
+}
+
+/** Удаление курса по id */
+export async function deleteCurrencyRate(id: number): Promise<void> {
+  await getDb().query('DELETE FROM currency_rates WHERE id = $1', [id]);
+}
+
 /** Курс за дату или ближайший предыдущий (для расчётов в отчётах) */
 export async function getCurrencyRateForDate(
   currencyCode: string,

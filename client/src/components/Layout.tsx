@@ -1,10 +1,25 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, Sun, Moon, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
+import { useTheme, type Theme } from '../context/ThemeContext.tsx';
+
+const THEMES: { value: Theme; icon: React.ReactNode; label: string }[] = [
+  { value: 'light',  icon: <Sun size={15} />,     label: 'Светлая' },
+  { value: 'dark',   icon: <Moon size={15} />,    label: 'Тёмная'  },
+  { value: 'system', icon: <Monitor size={15} />, label: 'Системная' },
+];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+
+  const cycleTheme = () => {
+    const idx = THEMES.findIndex(t => t.value === theme);
+    setTheme(THEMES[(idx + 1) % THEMES.length].value);
+  };
+
+  const currentTheme = THEMES.find(t => t.value === theme) ?? THEMES[2];
 
   const handleLogout = async () => {
     await logout();
@@ -18,12 +33,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ? [
           { to: '/admin/users', label: 'Сотрудники' },
           { to: '/admin/commission-tariffs', label: 'Тарифы' },
+          { to: '/admin/currency-rates', label: 'Курсы валют' },
         ]
       : []),
   ];
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: 'hsl(186,20%,97%)' }}>
+    <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="shrink-0 print:hidden" style={{ background: 'linear-gradient(90deg, #2d6b72 0%, #3d848c 60%, #4a9da6 100%)', boxShadow: '0 2px 12px rgba(45,107,114,0.25)' }}>
         <div className="mx-auto flex h-14 max-w-[1200px] items-center">
@@ -56,6 +72,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* User info + logout */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={cycleTheme}
+              title={currentTheme.label}
+              className="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150 text-white/80 hover:text-white hover:bg-white/15"
+            >
+              {currentTheme.icon}
+            </button>
+
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>
                 {(user?.displayName || user?.login || '?')[0].toUpperCase()}
@@ -87,7 +111,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Footer */}
-      <footer className="shrink-0 print:hidden border-t border-[#3d848c]/15" style={{ background: 'hsl(186,20%,97%)' }}>
+      <footer className="shrink-0 print:hidden border-t border-[#3d848c]/15 bg-background">
         <div className="mx-auto max-w-[1200px] flex items-center justify-center h-10">
           <span className="text-[11px] text-gray-400">
             © {new Date().getFullYear()} ЗАО «Кыргызская Фондовая Биржа». Все права защищены.

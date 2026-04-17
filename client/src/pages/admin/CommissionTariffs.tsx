@@ -48,6 +48,7 @@ type FieldError = {
 export default function CommissionTariffs() {
   const [list, setList] = useState<CommissionTariffRow[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [filterClass, setFilterClass] = useState<string>('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [classCode, setClassCode] = useState<string>('');
@@ -221,10 +222,26 @@ export default function CommissionTariffs() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
           <CardTitle>Тарифы комиссионных сборов</CardTitle>
-          <Button onClick={openCreate} size="sm">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Добавить тариф
-          </Button>
+          <div className="flex items-center gap-3">
+            <SelectWithSearch
+              value={filterClass}
+              onValueChange={(v) => setFilterClass(v === '__all__' ? '' : (v ?? ''))}
+              placeholder="Все классы"
+              withSearch={false}
+              triggerClassName="h-9 w-44 text-sm"
+              options={[
+                { value: '__all__', label: 'Все классы' },
+                ...[...new Set(list.map((r) => r.class_code).filter(Boolean))].map((code) => ({
+                  value: code as string,
+                  label: code as string,
+                })),
+              ]}
+            />
+            <Button onClick={openCreate} size="sm">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Добавить тариф
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Modal
@@ -426,7 +443,7 @@ export default function CommissionTariffs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {list.map((row) => (
+                {list.filter((r) => !filterClass || r.class_code === filterClass).map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.class_code ?? 'Все'}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatVolume(row.volume_from)}</TableCell>

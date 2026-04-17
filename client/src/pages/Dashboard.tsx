@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
-import { RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { getCurrencyRates, getCurrencyRatesHistory, refreshCurrencyRates } from '../api/currency-rates.ts';
 import type { CurrencyRate } from '../api/currency-rates.ts';
 import ReportChart from '../components/ReportChart.tsx';
@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
   const [todayTrades, setTodayTrades] = useState<TodayTrade[]>([]);
+  const [todayPage, setTodayPage] = useState(1);
+  const [todayPerPage, setTodayPerPage] = useState(20);
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayError, setTodayError] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -40,6 +42,7 @@ export default function Dashboard() {
           value: Number(r.value ?? 0),
         }));
         setTodayTrades(parsed);
+        setTodayPage(1);
       } catch (err) {
         setTodayError(err instanceof Error ? err.message : 'Ошибка загрузки сделок за сегодня');
       } finally {
@@ -65,6 +68,17 @@ export default function Dashboard() {
     loadVolumes();
   }, [month]);
 
+  const pagedTodayTrades = useMemo(() => {
+    const start = (todayPage - 1) * todayPerPage;
+    const end = start + todayPerPage;
+    return todayTrades.slice(start, end);
+  }, [todayPage, todayPerPage, todayTrades]);
+
+  const todayTotalPages = useMemo(() => {
+    if (todayTrades.length === 0) return 1;
+    return Math.ceil(todayTrades.length / todayPerPage);
+  }, [todayPerPage, todayTrades]);
+
   const groupedTodayTrades = useMemo(() => {
     const classMap = new Map<
       string,
@@ -82,7 +96,7 @@ export default function Dashboard() {
       }
     >();
 
-    for (const t of todayTrades) {
+    for (const t of pagedTodayTrades) {
       const classCode = t.classCode || 'Без класса';
       if (!classMap.has(classCode)) {
         classMap.set(classCode, {
@@ -108,7 +122,7 @@ export default function Dashboard() {
       className: cls.className,
       securities: Array.from(cls.securities.values()),
     }));
-  }, [todayTrades]);
+  }, [pagedTodayTrades]);
 
   const volumeChartData = useMemo(() => {
     if (volumes.length === 0) {
@@ -275,6 +289,54 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">За сегодня сделок не найдено.</p>
           ) : (
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Показано {(todayPage - 1) * todayPerPage + 1}-
+                    {Math.min(todayPage * todayPerPage, todayTrades.length)} из {todayTrades.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">На странице:</span>
+                    <select
+                      value={todayPerPage}
+                      onChange={(e) => {
+                        setTodayPerPage(Number(e.target.value));
+                        setTodayPage(1);
+                      }}
+                      className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    >
+                      {[10, 20, 50, 100].map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setTodayPage((p) => Math.max(1, p - 1))}
+                    disabled={todayPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="min-w-16 text-center text-xs text-muted-foreground">
+                    {todayPage} / {todayTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setTodayPage((p) => Math.min(todayTotalPages, p + 1))}
+                    disabled={todayPage >= todayTotalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               {groupedTodayTrades.map((cls) => (
                 <div key={cls.classCode} className="space-y-2">
                   <h3 className="text-sm font-semibold">

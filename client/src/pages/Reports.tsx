@@ -16,6 +16,10 @@ import Form2Report, {
   type ReportTradesForm2Data,
   type ClassGroupForm2,
 } from '../components/reports/Form2Report.tsx';
+import Form4Report, {
+  type ReportTradesForm4Data,
+  type ClassGroupForm4,
+} from '../components/reports/Form4Report.tsx';
 import Form3Report, {
   type ReportTradesForm3Data,
   type ParticipantGroup,
@@ -51,6 +55,7 @@ const FORM_META: Record<string, FormMeta> = {
   Blank_Form_1: { customView: true },
   Blank_Form_2: { customView: true },
   Blank_Form_3: { customView: true },
+  Blank_Form_4: { customView: true },
   Blank_Form_5: { customView: true },
   Blank_Form_6: { customView: true },
   Blank_Form_6A: { customView: true },
@@ -687,6 +692,45 @@ export default function Reports() {
                       />
                     </div>
                   </>
+                );
+              })()}
+
+              {/* Если Blank_Form_4 — показываем группированный шаблон Form4 */}
+              {(() => {
+                if (!result || result.type !== 'table' || selectedForm?.code !== 'Blank_Form_4' || result.rows.length === 0) {
+                  return null;
+                }
+
+                const { pagedRows, totalPages } = paginate(
+                  result.rows as Record<string, unknown>[],
+                  page,
+                  limit,
+                  isPrinting,
+                  result.total,
+                );
+
+                const { totalQuantity, totalAmount } = calcTotalsQuantityAndAmount(
+                  result.rows as Record<string, unknown>[],
+                );
+
+                const groupedForm4 = groupByClassAndSecForm4(pagedRows);
+                const form4Data: ReportTradesForm4Data = {
+                  periodFrom: filters.dateFrom || '',
+                  periodTo: filters.dateTo || '',
+                  classes: groupedForm4,
+                  totalSummary: {
+                    totalQuantity,
+                    totalAmount,
+                  },
+                };
+
+                return (
+                  <div className="mt-6" key={`form4-page-${page}`}>
+                    <Form4Report
+                      data={form4Data}
+                      showTotalSummary={isPrinting || page === totalPages}
+                    />
+                  </div>
                 );
               })()}
 
@@ -1492,6 +1536,69 @@ function groupByClassAndSecForm2(rows: Record<string, unknown>[]): ClassGroupFor
       });
     }
     
+    classes.push({ classId, className: classCodeToName.get(classId) ?? classId, securities });
+  }
+
+  return classes;
+}
+
+// Группировка для Формы 4: Класс → ЦБ → агрегация по дате
+function groupByClassAndSecForm4(rows: Record<string, unknown>[]): ClassGroupForm4[] {
+  const classMap = new Map<string, Map<string, Record<string, unknown>[]>>();
+  const classCodeToName = new Map<string, string>();
+  const secCodeToFullName = new Map<string, string>();
+
+  for (const row of rows) {
+    const classCode = String(row.classCode ?? 'Без класса');
+    const secCode = String(row.secCode ?? 'Без кода');
+    if (!classCodeToName.has(classCode) && row.className != null) classCodeToName.set(classCode, String(row.className));
+    if (!secCodeToFullName.has(secCode) && row.secFullName != null) secCodeToFullName.set(secCode, String(row.secFullName));
+
+    if (!classMap.has(classCode)) {
+      classMap.set(classCode, new Map());
+    }
+    const secMap = classMap.get(classCode)!;
+    if (!secMap.has(secCode)) {
+      secMap.set(secCode, []);
+    }
+    secMap.get(secCode)!.push(row);
+  }
+
+  const classes: ClassGroupForm4[] = [];
+  for (const [classId, secMap] of classMap.entries()) {
+    const securities: ClassGroupForm4['securities'] = [];
+
+    for (const [securityId, trades] of secMap.entries()) {
+      const tradesCount = trades.length;
+      const totalQuantity = trades.reduce((sum, t) => sum + Number(t.quantity ?? 0), 0);
+      const totalAmount = trades.reduce((sum, t) => sum + Number(t.value ?? 0), 0);
+      const prices = trades.map(t => Number(t.price ?? 0)).filter(p => p > 0);
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+
+      const lastTrade = trades[trades.length - 1];
+      const lastTradePrice = Number(lastTrade?.price ?? 0);
+      const lastTradeQuantity = Number(lastTrade?.quantity ?? 0);
+      const lastTradeAmount = Number(lastTrade?.value ?? 0);
+      const tradeDate = formatDate(trades[0]?.tradeDate);
+
+      securities.push({
+        securityId,
+        secFullName: secCodeToFullName.get(securityId) ?? securityId,
+        tradeDate,
+        tradesCount,
+        totalQuantity,
+        totalAmount,
+        maxPrice,
+        minPrice,
+        avgPrice,
+        lastTradePrice,
+        lastTradeQuantity,
+        lastTradeAmount,
+      });
+    }
+
     classes.push({ classId, className: classCodeToName.get(classId) ?? classId, securities });
   }
 

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
+import { ThemeProvider } from './context/ThemeContext.tsx';
 import Layout from './components/Layout.tsx';
 import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
@@ -7,6 +8,7 @@ import Reports from './pages/Reports.tsx';
 import Users from './pages/admin/Users.tsx';
 import ReportFormsAdmin from './pages/admin/ReportForms.tsx';
 import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
+import CurrencyRates from './pages/admin/CurrencyRates.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -29,6 +31,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -72,8 +75,17 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/currency-rates"
+          element={
+            <ProtectedRoute>
+              <AdminRoute><CurrencyRates /></AdminRoute>
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

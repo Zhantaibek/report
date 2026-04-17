@@ -314,6 +314,7 @@ function SelectWithSearch({
               return (
                 <div
                   key={opt.value}
+                  title={opt.label}
                   onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                   className={cn(
                     'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
@@ -340,6 +341,7 @@ function SelectWithSearch({
                   return (
                     <div
                       key={opt.value}
+                      title={opt.label}
                       onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                       className={cn(
                         'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',

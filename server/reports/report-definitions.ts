@@ -457,6 +457,12 @@ const form5Query = baseTradesQuery;
 const form6Query = baseTradesQuery;
 
 /**
+ * Форма 4 — отдельный запрос (на текущем этапе идентичен форме 2).
+ * Вынесен отдельно для дальнейшего независимого изменения.
+ */
+const form4Query = baseTradesQuery;
+
+/**
  * Форма 8 — Отчет о заключенных сделках (упрощённый вид: компания, торговый символ, цена, кол-во, сумма).
  * Использует одну строку на сделку без агрегирования.
  */
@@ -529,6 +535,14 @@ export const reportDefinitions: ReportDefinition[] = [
     type: 'table',
     category: 'Отчеты по системной информации',
     sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_4',
+    name: 'Blank_Form_4',
+    description: 'Форма 4 - Отчет о заключенных сделках',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: form4Query,
   },
   {
     code: 'Blank_Form_5',
