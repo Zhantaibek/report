@@ -29,8 +29,14 @@ public class OracleQuery {
         String dateFrom = args[5];
         String dateTo   = args[6];
         // Параметр с API = ID из CURRINSTRUMENT; в ARCTS.DEAL / TS.DEAL фильтр OWNID = значение + 1.
-        long   ownIdArg = args.length > 7 ? Long.parseLong(args[7]) : 8853816L;
-        long   ownId    = ownIdArg + 1;
+        boolean hasOwnId = args.length > 7 && args[7] != null && args[7].trim().length() > 0;
+        long ownIdArg = 0L;
+        long ownId = 0L;
+        if (hasOwnId) {
+            ownIdArg = Long.parseLong(args[7]);
+            ownId = ownIdArg + 1;
+        }
+        String ownFilter = hasOwnId ? " AND t.OWNID = " + ownId : "";
 
         // Number of calendar days in range (used for ROWNUM-based date series)
         LocalDate dFrom = LocalDate.parse(dateFrom);
@@ -62,13 +68,13 @@ public class OracleQuery {
             "       FROM ARCTS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND t.OWNID = " + ownId +
+            ownFilter +
             "       UNION ALL " +
             "       SELECT t.SERIAL, t.VOLUME, t.VOLCONTR, t.DATE0 " +
             "       FROM TS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND t.OWNID = " + ownId +
+            ownFilter +
             "     ) u " +
             "   ) x " +
             "   WHERE x.rn = 1) t " +
@@ -79,7 +85,7 @@ public class OracleQuery {
             "ORDER BY dates.dt";
 
         // TODO(временно): убрать после отладки загрузки сделок
-        System.err.println("[OracleQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " ownIdArg=" + ownIdArg + " ownIdInSql=" + ownId + " dayCount=" + dayCount);
+        System.err.println("[OracleQuery DEBUG] dateFrom=" + dateFrom + " dateTo=" + dateTo + " hasOwnId=" + hasOwnId + " ownIdArg=" + ownIdArg + " ownIdInSql=" + ownId + " dayCount=" + dayCount);
         System.err.println("[OracleQuery DEBUG] SQL (? : 1=series, 2-3=ARCTS BETWEEN, 4-5=TS BETWEEN):\n" + sql);
 
         try (Connection conn = DriverManager.getConnection(url, user, password);

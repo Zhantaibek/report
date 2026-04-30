@@ -51,8 +51,15 @@ public class OracleGoldQuery {
         String password = args[4];
         String dateFrom = args[5];
         String dateTo   = args[6];
-        long   ownIdArg = args.length > 7 ? Long.parseLong(args[7]) : 8853816L;
-        long   ownId    = ownIdArg + 1;
+        boolean hasOwnId = args.length > 7 && args[7] != null && args[7].trim().length() > 0;
+        long ownIdArg = 0L;
+        long ownId = 0L;
+        if (hasOwnId) {
+            ownIdArg = Long.parseLong(args[7]);
+            ownId = ownIdArg + 1;
+        }
+        String ownFilter = hasOwnId ? " AND d1.OWNID = " + ownId : "";
+        String ownFilterTs = hasOwnId ? " AND t.OWNID = " + ownId : "";
 
         LocalDate dFrom = LocalDate.parse(dateFrom);
         LocalDate dTo   = LocalDate.parse(dateTo);
@@ -94,7 +101,7 @@ public class OracleGoldQuery {
             "       FROM SYS.DEAL1 d1, SYS.DEAL1 d2 " +
             "       WHERE d1.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND d1.OWNID = " + ownId +
+            ownFilter +
             "         AND d1.ID < d1.IDPAIR " +
             "         AND d1.IDPAIR = d2.ID(+) " +
             "         AND d1.OWNID = d2.OWNID(+) " +
@@ -109,7 +116,7 @@ public class OracleGoldQuery {
             "       FROM TS.DEAL t " +
             "       WHERE t.DATE0 BETWEEN makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
             "                         AND makelongdate(TO_DATE(?, 'YYYY-MM-DD')) " +
-            "         AND t.OWNID = " + ownId +
+            ownFilterTs +
             "     ) u " +
             "   ) x " +
             "   WHERE x.rn = 1) t, " +

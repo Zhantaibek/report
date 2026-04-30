@@ -99,8 +99,7 @@ export async function queryOracleUsd(
   dateTo: string,
   ownId?: number,
 ): Promise<UsdTradeRow[]> {
-  const effectiveOwnId = ownId ?? config.oracle.ownId;
-  const raw = await runJavaBridge('OracleQuery', [dateFrom, dateTo, String(effectiveOwnId)]);
+  const raw = await runJavaBridge('OracleQuery', ownId !== undefined ? [dateFrom, dateTo, String(ownId)] : [dateFrom, dateTo]);
   const rows = JSON.parse(raw) as Record<string, unknown>[];
   return rows.map((r) => ({
     trade_date: String(r.trade_date ?? ''),
@@ -133,8 +132,7 @@ export async function queryOracleGold(
   dateTo: string,
   ownId?: number,
 ): Promise<GoldContractRow[]> {
-  const effectiveOwnId = ownId ?? config.oracle.ownId;
-  const raw = await runJavaBridge('OracleGoldQuery', [dateFrom, dateTo, String(effectiveOwnId)]);
+  const raw = await runJavaBridge('OracleGoldQuery', ownId !== undefined ? [dateFrom, dateTo, String(ownId)] : [dateFrom, dateTo]);
   const rows = JSON.parse(raw) as Record<string, unknown>[];
   return rows.map((r) => ({
     serial:     Number(r.serial     ?? 0),

@@ -24,7 +24,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Преобразуем в формат, совместимый со старым API
   const form = {
     id: dbForm.id,
-    code: dbForm.code,
+    code: definition.code,
     name: dbForm.name,
     description: dbForm.description,
     type: dbForm.type,

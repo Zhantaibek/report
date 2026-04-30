@@ -376,7 +376,7 @@ export default function Reports() {
                     setSelectedOwnId(undefined);
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
-                    if ((form?.code === 'Blank_Form_USD' || GOLD_ORACLE_REPORT_CODES.has(form?.code ?? '')) && oracleInstruments.length === 0) {
+                    if (form?.code === 'Blank_Form_USD' || GOLD_ORACLE_REPORT_CODES.has(form?.code ?? '')) {
                       setLoadingInstruments(true);
                       getOracleInstruments()
                         .then(setOracleInstruments)

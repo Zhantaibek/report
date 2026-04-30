@@ -12,6 +12,10 @@ export interface ReportDefinition {
   sql?: string;
 }
 
+function normalizeReportCode(code: string): string {
+  return code.trim().toLowerCase();
+}
+
 /**
  * Базовый SQL-запрос для получения уникальных сделок.
  * Продавец/покупатель через JOIN по Operation (Купля/Продажа).
@@ -687,7 +691,8 @@ export const reportDefinitions: ReportDefinition[] = [
  * Получить определение формы по коду
  */
 export function getReportDefinition(code: string): ReportDefinition | undefined {
-  return reportDefinitions.find(r => r.code === code);
+  const normalizedCode = normalizeReportCode(code);
+  return reportDefinitions.find((r) => normalizeReportCode(r.code) === normalizedCode);
 }
 
 /**
@@ -701,5 +706,6 @@ export function getAllReportDefinitions(): ReportDefinition[] {
  * Получить SQL-запрос для формы
  */
 export function getSqlForReport(code: string): string | undefined {
-  return reportDefinitions.find(r => r.code === code)?.sql;
+  const normalizedCode = normalizeReportCode(code);
+  return reportDefinitions.find((r) => normalizeReportCode(r.code) === normalizedCode)?.sql;
 }
