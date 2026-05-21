@@ -73,8 +73,9 @@ import { Alert, AlertDescription } from '../components/ui/alert.tsx';
  *   quik   — основная БД (Postgres/MSSQL)
  *   usd    — Oracle отчёт по USD (runUsdReport)
  *   gold   — Oracle отчёт по золоту (runGoldReport)
+ *   index  — Oracle индекс (runIndexReport)
  */
-type FormDataSource = 'quik' | 'usd' | 'gold';
+type FormDataSource = 'quik' | 'usd' | 'gold' | 'index';
 
 /**
  * Режим фильтров в панели:
