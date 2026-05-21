@@ -487,6 +487,72 @@ ORDER BY b."TradeDate", sec."SecFullName", b."SecCode", b."TradeNum"
 `.trim();
 
 /**
+ * Госхолдинг Форма 10 — индекс за торговый день (расчёт из QUIK).
+ * Листинговые акции: VWAP за день × вес (суммарный объём сделок за период по бумаге).
+ * Индекс = капитализация корзины / капитализация в первый торговый день × 100.
+ */
+const stateHoldingForm10Query = `
+WITH index_universe AS (
+  SELECT sec."SecCode"
+  FROM "Securities" sec
+  LEFT JOIN "Classes" cl ON cl."ClassCode" = sec."ClassCode"
+  WHERE sec."ClassCode" = 'LISTEDSTOCKK'
+     OR (
+       LOWER(COALESCE(cl."ClassName", sec."ClassCode", '')) LIKE '%листинг%'
+       AND LOWER(COALESCE(cl."ClassName", sec."ClassCode", '')) LIKE '%акц%'
+     )
+),
+period_weights AS (
+  SELECT
+    t."SecCode",
+    SUM(t."Qty")::numeric AS qty_weight
+  FROM "Trades" t
+  INNER JOIN index_universe u ON u."SecCode" = t."SecCode"
+  WHERE t."Operation" = 'Купля'
+    AND t."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
+  GROUP BY t."SecCode"
+  HAVING SUM(t."Qty") > 0
+),
+daily_vwap AS (
+  SELECT
+    t."TradeDate"::date AS d,
+    t."SecCode",
+    SUM(t."Price" * t."Qty") / NULLIF(SUM(t."Qty"), 0) AS vwap
+  FROM "Trades" t
+  INNER JOIN index_universe u ON u."SecCode" = t."SecCode"
+  WHERE t."Operation" = 'Купля'
+    AND t."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
+  GROUP BY t."TradeDate"::date, t."SecCode"
+),
+daily_cap AS (
+  SELECT
+    dv.d,
+    SUM(dv.vwap * pw.qty_weight) AS market_cap
+  FROM daily_vwap dv
+  INNER JOIN period_weights pw ON pw."SecCode" = dv."SecCode"
+  GROUP BY dv.d
+),
+first_day AS (
+  SELECT MIN(d) AS d0 FROM daily_cap
+),
+base_cap AS (
+  SELECT dc.market_cap
+  FROM daily_cap dc
+  INNER JOIN first_day fd ON dc.d = fd.d0
+  LIMIT 1
+)
+SELECT
+  to_char(dc.d, 'YYYY-MM-DD') AS "id",
+  to_char(dc.d, 'YYYY-MM-DD') AS "tradeDate",
+  ROUND(
+    dc.market_cap / NULLIF((SELECT market_cap FROM base_cap), 0) * 100,
+    4
+  ) AS "indexValue"
+FROM daily_cap dc
+ORDER BY dc.d
+`.trim();
+
+/**
  * Госхолдинг, Форма 5 — топ-5 участников по сумме сделок (сом) по каждому дню периода.
  * Те же сделки, что baseTradesQuery (Купля+Продажа по TradeNum); объём учитывается у покупателя и у продавца.
  * Размещение / обращение — по ключевым словам в названии класса инструмента.
@@ -824,6 +890,7 @@ export const reportDefinitions: ReportDefinition[] = [
     description: 'Форма 10 — Значение индекса за торговый день',
     type: 'table',
     category: 'Отчеты ГосФинНадзор',
+    sql: stateHoldingForm10Query,
   },
   {
     code: 'Auction_Summary',

@@ -63,7 +63,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Дедупликация по ID сделки (на случай, если разные источники вернули одинаковые сделки)
   // Для аукционов не дедуплицируем — строки агрегированы (по цене или сравнение текущий/предыдущий)
   let uniqueTrades: Trade[];
-  if (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8') {
+  if (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8' || form.code === 'StateHolding_Form10') {
     uniqueTrades = allTrades;
   } else {
     const uniqueTradesMap = new Map<string, Trade>();
@@ -113,7 +113,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Если использовался custom SQL с параметрами, фильтрация уже применена в запросе
   // Для аукционов в строках нет brokerId — применяем только фильтр по инструменту
   const filtered = sqlQuery
-    ? applyFilters(withCommissions, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8')
+    ? applyFilters(withCommissions, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8' || form.code === 'StateHolding_Form10')
         ? { instrument: filters.instrument, classCode: filters.classCode }
         : { brokerId: filters.brokerId, firmCode: filters.firmCode, instrument: filters.instrument, classCode: filters.classCode })
     : applyFilters(withCommissions, filters);

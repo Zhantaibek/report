@@ -5,7 +5,6 @@
  */
 import React from 'react';
 import { ReportHeader } from './ReportHeader';
-import type { IndexRow } from '../../api/reports';
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
@@ -63,13 +62,6 @@ export function StateHoldingForm10Report({ data }: Props) {
                 Изменения индекса по сравнению с индексом предыдущего торгового дня (в %)
               </th>
             </tr>
-            <tr className="bg-muted/40">
-              {['1', '2', '3', '4'].map((n) => (
-                <th key={n} className="border border-border px-2 py-1 text-center text-muted-foreground font-normal">
-                  {n}
-                </th>
-              ))}
-            </tr>
           </thead>
           <tbody>
             {data.rows.map((row, idx) => (
@@ -90,19 +82,21 @@ export function StateHoldingForm10Report({ data }: Props) {
 }
 
 export function buildStateHoldingForm10Data(
-  rows: IndexRow[],
+  rows: Record<string, unknown>[],
   periodFrom: string,
   periodTo: string,
 ): StateHoldingForm10Data {
-  const out: StateHoldingForm10Row[] = rows.map((r, i) => {
-    const prev = i > 0 ? rows[i - 1].index_value : null;
+  const sorted = [...rows].sort((a, b) =>
+    String(a.tradeDate ?? '').localeCompare(String(b.tradeDate ?? '')),
+  );
+  const out: StateHoldingForm10Row[] = sorted.map((r, i) => {
+    const indexValue = Number(r.indexValue ?? 0);
+    const prev = i > 0 ? Number(sorted[i - 1].indexValue ?? 0) : null;
     const changePct =
-      prev != null && prev !== 0
-        ? ((r.index_value - prev) / prev) * 100
-        : null;
+      prev != null && prev !== 0 ? ((indexValue - prev) / prev) * 100 : null;
     return {
-      indexDate:  r.index_date,
-      indexValue: r.index_value,
+      indexDate: String(r.tradeDate ?? '').slice(0, 10),
+      indexValue,
       changePct,
     };
   });

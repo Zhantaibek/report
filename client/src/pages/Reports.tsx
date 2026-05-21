@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button.tsx';
 import { SelectWithSearch, type SelectOptionGroup } from '../components/ui/select.tsx';
 import { Play, Printer, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText, Building2 } from 'lucide-react';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, runGoldReport, runIndexReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument, type IndexRow } from '../api/reports.ts';
+import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -73,9 +73,8 @@ import { Alert, AlertDescription } from '../components/ui/alert.tsx';
  *   quik   — основная БД (Postgres/MSSQL)
  *   usd    — Oracle отчёт по USD (runUsdReport)
  *   gold   — Oracle отчёт по золоту (runGoldReport)
- *   index  — Oracle индекс (runIndexReport)
  */
-type FormDataSource = 'quik' | 'usd' | 'gold' | 'index';
+type FormDataSource = 'quik' | 'usd' | 'gold';
 
 /**
  * Режим фильтров в панели:
@@ -128,7 +127,7 @@ const FORM_META: Record<string, FormMeta> = {
   StateHolding_Form7:      { customView: true, dataSource: 'quik', filterMode: 'firm' },
   StateHolding_Form8:      { customView: true, dataSource: 'quik', filterMode: 'none' },
   StateHolding_Form9:      { customView: true, dataSource: 'quik', filterMode: 'none' },
-  StateHolding_Form10:     { customView: true, dataSource: 'index', filterMode: 'none' },
+  StateHolding_Form10:     { customView: true, dataSource: 'quik', filterMode: 'none' },
 };
 
 /** Все формы с собственным шаблоном (не generic-таблица); для них доступна печать. */
@@ -224,7 +223,6 @@ export default function Reports() {
   const [result, setResult] = useState<ReportResult | null>(null);
   const [usdRows, setUsdRows] = useState<UsdReportRow[] | null>(null);
   const [goldRows, setGoldRows] = useState<GoldContractRow[] | null>(null);
-  const [indexRows, setIndexRows] = useState<IndexRow[] | null>(null);
   const [oracleInstruments, setOracleInstruments] = useState<OracleInstrument[]>([]);
   const [loadingInstruments, setLoadingInstruments] = useState(false);
   const [selectedOwnId, setSelectedOwnId] = useState<number | undefined>(undefined);
@@ -254,7 +252,6 @@ export default function Reports() {
     setPage(1);
     setUsdRows(null);
     setGoldRows(null);
-    setIndexRows(null);
     try {
       const ds = selectedFormMeta?.dataSource ?? 'quik';
       if (ds === 'usd') {
@@ -265,10 +262,6 @@ export default function Reports() {
         const res = await runGoldReport(filters.dateFrom, filters.dateTo, selectedOwnId);
         setGoldRows(res.rows);
         setResult(null);
-      } else if (ds === 'index') {
-        const res = await runIndexReport(filters.dateFrom, filters.dateTo);
-        setIndexRows(res.rows);
-        setResult(null);
       } else {
         const res = await runReport({ reportFormId: Number(selectedFormId), filters });
         setResult(res);
@@ -278,7 +271,6 @@ export default function Reports() {
       setResult(null);
       setUsdRows(null);
       setGoldRows(null);
-      setIndexRows(null);
       setRunError(err instanceof Error ? err.message : 'Ошибка при формировании отчёта');
     } finally {
       setLoading(false);
@@ -376,7 +368,6 @@ export default function Reports() {
 
     if (code === 'Gold_Daily_Summary' && goldRows?.length)    return { totalRecords: 1, totalPages: 1 };
     if (code === 'Exchange_Contract_Gold' && goldRows?.length) return onePerPage(goldRows.length);
-    if (code === 'StateHolding_Form10' && indexRows?.length)   return { totalRecords: 1, totalPages: 1 };
     if (!result || result.type !== 'table' || result.rows.length === 0) return null;
 
     const rows = result.rows as Record<string, unknown>[];
@@ -398,7 +389,7 @@ export default function Reports() {
 
     // Стандартная пагинация
     return { totalRecords: result.total, totalPages: Math.ceil(result.total / limit) };
-  }, [result, selectedForm, groupedResult, goldRows, indexRows, limit]);
+  }, [result, selectedForm, groupedResult, goldRows, limit]);
 
   // ── Основная функция рендера для выбранной формы ────────────────────────
   const renderFormContent = () => {
@@ -575,20 +566,11 @@ export default function Reports() {
 
     // ── StateHolding_Form10 ─────────────────────────────────────────────────
     if (code === 'StateHolding_Form10') {
-      if (indexRows === null) return null;
-      if (!indexRows.length) {
-        return (
-          <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
-            <p className="text-base font-semibold text-foreground">Данные не найдены</p>
-            <p className="mt-1 text-sm text-muted-foreground max-w-sm">
-              За выбранный период значения индекса не найдены.
-            </p>
-          </div>
-        );
-      }
+      if (!tableRows?.length) return null;
+      const { pagedRows } = getPagedRows(tableRows);
       return (
         <div className="mt-6">
-          <StateHoldingForm10Report data={buildStateHoldingForm10Data(indexRows, dateFrom, dateTo)} />
+          <StateHoldingForm10Report data={buildStateHoldingForm10Data(pagedRows, dateFrom, dateTo)} />
         </div>
       );
     }
@@ -891,7 +873,6 @@ export default function Reports() {
                     setPage(1);
                     setUsdRows(null);
                     setGoldRows(null);
-                    setIndexRows(null);
                     setSelectedOwnId(undefined);
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
@@ -1110,8 +1091,7 @@ export default function Reports() {
                 {(selectedFormMeta?.customView && (
                   (result != null && (result.type !== 'table' || result.rows.length > 0)) ||
                   (usdRows != null && usdRows.length > 0) ||
-                  (goldRows != null && goldRows.length > 0) ||
-                  (indexRows != null && indexRows.length > 0)
+                  (goldRows != null && goldRows.length > 0)
                 )) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
