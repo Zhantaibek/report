@@ -19,7 +19,11 @@ export async function syncReportForms(): Promise<void> {
       });
       console.log(`[sync] Created report form: ${def.code}`);
     } else {
-      await reportFormsRepo.updateReportFormByCode(def.code, { singleDate: def.singleDate });
+      await reportFormsRepo.updateReportFormByCode(def.code, {
+        singleDate: def.singleDate,
+        category: def.category,
+        description: def.description,
+      });
     }
   }
 }

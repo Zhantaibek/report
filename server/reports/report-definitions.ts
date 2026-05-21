@@ -783,7 +783,7 @@ export const reportDefinitions: ReportDefinition[] = [
     description:
       'Форма 5 — сведения о 5 участниках торгов с наибольшей суммой сделок в сомах (по рабочим дням периода)',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
     sql: stateHoldingForm5Top5Query,
   },
   {
@@ -791,7 +791,7 @@ export const reportDefinitions: ReportDefinition[] = [
     name: 'StateHolding_Form6',
     description: 'Форма 6 — Отчет о сделках (первичный/вторичный рынок, листинг)',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
     sql: baseTradesQuery,
   },
   {
@@ -799,7 +799,7 @@ export const reportDefinitions: ReportDefinition[] = [
     name: 'StateHolding_Form7',
     description: 'Форма 7 — Отчет о сделках по брокерским и дилерским фирмам',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
     sql: stateHoldingForm7Query,
   },
   {
@@ -807,7 +807,7 @@ export const reportDefinitions: ReportDefinition[] = [
     name: 'StateHolding_Form8',
     description: 'Форма 8 — Список ценных бумаг, допущенных к обращению через торговую систему фондовой биржи',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
     sql: stateHoldingForm8Query,
   },
   {
@@ -815,7 +815,7 @@ export const reportDefinitions: ReportDefinition[] = [
     name: 'StateHolding_Form9',
     description: 'Форма 9 — Информация о торгах (котировки, приказы)',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
     sql: stateHoldingForm9Query,
   },
   {
@@ -823,7 +823,7 @@ export const reportDefinitions: ReportDefinition[] = [
     name: 'StateHolding_Form10',
     description: 'Форма 10 — Значение индекса за торговый день',
     type: 'table',
-    category: 'Отчеты госхолдинг',
+    category: 'Отчеты ГосФинНадзор',
   },
   {
     code: 'Auction_Summary',

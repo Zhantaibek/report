@@ -122,7 +122,7 @@ const FORM_META: Record<string, FormMeta> = {
   Exchange_Contract_Gold:{ customView: true, dataSource: 'gold', filterMode: 'oracle' },
   Gold_Daily_Summary:    { customView: true, dataSource: 'gold', filterMode: 'oracle' },
 
-  // ── Госхолдинг ────────────────────────────────────────────────────────────
+  // ── ГосФинНадзор ──────────────────────────────────────────────────────────
   StateHolding_Form5_Top5: { customView: true, dataSource: 'quik', filterMode: 'none' },
   StateHolding_Form6:      { customView: true, dataSource: 'quik', filterMode: 'none' },
   StateHolding_Form7:      { customView: true, dataSource: 'quik', filterMode: 'firm' },
@@ -139,7 +139,7 @@ const REPORT_FORM_CATEGORY_ORDER = [
   'Отчеты по системной информации',
   'Юридические документы',
   'Отчеты по Аукциону',
-  'Отчеты госхолдинг',
+  'Отчеты ГосФинНадзор',
 ] as const;
 
 function compareReportFormCategories(a: string, b: string): number {
@@ -918,7 +918,7 @@ export default function Reports() {
                     label: category,
                     icon: category === 'Отчеты по Аукциону'
                       ? <BarChart2 className="mr-2 h-4 w-4 shrink-0 opacity-70" />
-                      : category === 'Отчеты госхолдинг'
+                      : category === 'Отчеты ГосФинНадзор'
                         ? <Building2 className="mr-2 h-4 w-4 shrink-0 opacity-70" />
                         : <FileText className="mr-2 h-4 w-4 shrink-0 opacity-70" />,
                     options: categoryForms.map((form) => ({

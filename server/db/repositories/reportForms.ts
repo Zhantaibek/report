@@ -46,8 +46,18 @@ export async function createReportForm(data: CreateReportFormDto): Promise<numbe
   return result.rows[0].id;
 }
 
-export async function updateReportFormByCode(code: string, data: { singleDate?: boolean }): Promise<void> {
-  if (data.singleDate === undefined) return;
+export async function updateReportFormByCode(
+  code: string,
+  data: { singleDate?: boolean; category?: string; description?: string | null },
+): Promise<void> {
   const db = getDb();
-  await db.query('UPDATE report_forms SET single_date = $1 WHERE code = $2', [data.singleDate, code]);
+  if (data.singleDate !== undefined) {
+    await db.query('UPDATE report_forms SET single_date = $1 WHERE code = $2', [data.singleDate, code]);
+  }
+  if (data.category !== undefined) {
+    await db.query('UPDATE report_forms SET category = $1 WHERE code = $2', [data.category, code]);
+  }
+  if (data.description !== undefined) {
+    await db.query('UPDATE report_forms SET description = $1 WHERE code = $2', [data.description, code]);
+  }
 }
