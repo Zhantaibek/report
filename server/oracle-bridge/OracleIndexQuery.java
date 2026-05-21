@@ -1,5 +1,6 @@
 import java.sql.*;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Oracle JDBC query bridge for Exchange Index report (Форма 10).
@@ -8,23 +9,8 @@ import java.nio.charset.StandardCharsets;
  * Output: JSON array to stdout, errors to stderr.
  *
  * Returns: index_date (YYYY-MM-DD), index_value (points)
- * % change vs previous trading day is computed client-side.
- *
- * TODO: replace ARCTS.EXINDEX / CALCDATE / INDEXVALUE with the actual table/column names.
  */
 public class OracleIndexQuery {
-
-    static String stringFromOracleBytes(ResultSet rs, int colIdx) throws SQLException {
-        byte[] bytes = rs.getBytes(colIdx);
-        if (bytes == null) return null;
-        String utf8 = new String(bytes, StandardCharsets.UTF_8).trim();
-        if (!utf8.contains("\uFFFD")) return utf8;
-        try { return new String(bytes, "Cp1251").trim(); } catch (Exception e) { return utf8; }
-    }
-
-    static String jsonEscape(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
-    }
 
     public static void main(String[] args) throws Exception {
         if (args.length < 7) {
@@ -39,24 +25,35 @@ public class OracleIndexQuery {
         String dateFrom = args[5];
         String dateTo   = args[6];
 
+        LocalDate dFrom = LocalDate.parse(dateFrom);
+        LocalDate dTo   = LocalDate.parse(dateTo);
+        int dayCount = (int) ChronoUnit.DAYS.between(dFrom, dTo) + 1;
+
         String url = "jdbc:oracle:thin:@" + host + ":" + port + ":" + sid;
         Class.forName("oracle.jdbc.driver.OracleDriver");
 
-        // Discover tables/views whose names contain INDEX in accessible schemas
         String sql =
-            "SELECT OWNER, OBJECT_NAME, OBJECT_TYPE " +
-            "FROM ALL_OBJECTS " +
-            "WHERE UPPER(OBJECT_NAME) LIKE '%INDEX%' " +
-            "  AND OBJECT_TYPE IN ('TABLE', 'VIEW') " +
-            "ORDER BY OWNER, OBJECT_NAME";
+            "SELECT " +
+            "  TO_CHAR(dates.dt, 'YYYY-MM-DD') AS index_date, " +
+            "  e.INDEXVALUE                      AS index_value " +
+            "FROM " +
+            "  (SELECT TO_DATE(?, 'YYYY-MM-DD') + ROWNUM - 1 AS dt " +
+            "   FROM ARCTS.DEAL " +
+            "   WHERE ROWNUM <= " + dayCount + ") dates " +
+            "INNER JOIN ARCTS.EXINDEX e " +
+            "  ON e.CALCDATE >= makelongdate(dates.dt) " +
+            " AND e.CALCDATE <  makelongdate(dates.dt + 1) " +
+            "ORDER BY dates.dt";
 
         try (Connection conn = DriverManager.getConnection(url, user, password);
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ResultSet rs = ps.executeQuery();
+            ps.setString(1, dateFrom);
 
+            ResultSet rs = ps.executeQuery();
             ResultSetMetaData meta = rs.getMetaData();
             int cols = meta.getColumnCount();
+
             StringBuilder sb = new StringBuilder("[");
             boolean first = true;
             while (rs.next()) {
@@ -65,16 +62,26 @@ public class OracleIndexQuery {
                 sb.append("{");
                 for (int i = 1; i <= cols; i++) {
                     if (i > 1) sb.append(",");
-                    String col = meta.getColumnLabel(i).toLowerCase();
+                    String col = meta.getColumnName(i).toLowerCase();
+                    Object val = rs.getObject(i);
                     sb.append("\"").append(col).append("\":");
-                    String s = stringFromOracleBytes(rs, i);
-                    sb.append(s != null ? "\"" + jsonEscape(s) + "\"" : "null");
+                    if (val == null) {
+                        sb.append("null");
+                    } else if (val instanceof Number) {
+                        sb.append(val.toString());
+                    } else {
+                        String s = val.toString()
+                            .replace("\\", "\\\\")
+                            .replace("\"", "\\\"")
+                            .replace("\n", "\\n")
+                            .replace("\r", "\\r");
+                        sb.append("\"").append(s).append("\"");
+                    }
                 }
                 sb.append("}");
             }
             sb.append("]");
-            System.out.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-            System.out.println();
+            System.out.println(sb.toString());
         }
     }
 }

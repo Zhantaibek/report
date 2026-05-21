@@ -575,7 +575,17 @@ export default function Reports() {
 
     // ── StateHolding_Form10 ─────────────────────────────────────────────────
     if (code === 'StateHolding_Form10') {
-      if (!indexRows?.length) return null;
+      if (indexRows === null) return null;
+      if (!indexRows.length) {
+        return (
+          <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
+            <p className="text-base font-semibold text-foreground">Данные не найдены</p>
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm">
+              За выбранный период значения индекса не найдены.
+            </p>
+          </div>
+        );
+      }
       return (
         <div className="mt-6">
           <StateHoldingForm10Report data={buildStateHoldingForm10Data(indexRows, dateFrom, dateTo)} />
@@ -881,6 +891,7 @@ export default function Reports() {
                     setPage(1);
                     setUsdRows(null);
                     setGoldRows(null);
+                    setIndexRows(null);
                     setSelectedOwnId(undefined);
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
@@ -1099,7 +1110,8 @@ export default function Reports() {
                 {(selectedFormMeta?.customView && (
                   (result != null && (result.type !== 'table' || result.rows.length > 0)) ||
                   (usdRows != null && usdRows.length > 0) ||
-                  (goldRows != null && goldRows.length > 0)
+                  (goldRows != null && goldRows.length > 0) ||
+                  (indexRows != null && indexRows.length > 0)
                 )) && (
                   <Button variant="secondary" size="sm" onClick={handlePrint}>
                     <Printer className="h-4 w-4 mr-1.5" />
