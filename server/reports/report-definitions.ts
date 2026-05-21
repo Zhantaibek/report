@@ -487,6 +487,177 @@ ORDER BY b."TradeDate", sec."SecFullName", b."SecCode", b."TradeNum"
 `.trim();
 
 /**
+ * Госхолдинг, Форма 5 — топ-5 участников по сумме сделок (сом) по каждому дню периода.
+ * Те же сделки, что baseTradesQuery (Купля+Продажа по TradeNum); объём учитывается у покупателя и у продавца.
+ * Размещение / обращение — по ключевым словам в названии класса инструмента.
+ */
+const stateHoldingForm5Top5Query = `
+WITH base AS (
+  SELECT
+    b."TradeNum",
+    b."TradeDate"::date AS d,
+    b."FirmId" AS buyer_firm_id,
+    COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS buyer_name,
+    s."FirmId" AS seller_firm_id,
+    COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS seller_name,
+    b."Qty" AS qty,
+    b."Value" AS value,
+    LOWER(COALESCE(cl."ClassName", b."ClassCode", '')) AS class_l
+  FROM "Trades" b
+  JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+  LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
+  LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
+  LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
+  WHERE b."Operation" = 'Купля'
+    AND b."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
+),
+classified AS (
+  SELECT
+    *,
+    CASE
+      WHEN class_l LIKE '%аукцион%' OR class_l LIKE '%размещ%'
+        OR class_l LIKE '%первичн%' OR class_l LIKE '%эмисс%'
+        OR class_l LIKE '%выпуск%' OR class_l LIKE '%допразмещ%'
+      THEN value
+      ELSE 0::numeric
+    END AS placement_part,
+    CASE
+      WHEN class_l LIKE '%аукцион%' OR class_l LIKE '%размещ%'
+        OR class_l LIKE '%первичн%' OR class_l LIKE '%эмисс%'
+        OR class_l LIKE '%выпуск%' OR class_l LIKE '%допразмещ%'
+      THEN 0::numeric
+      ELSE value
+    END AS circulation_part
+  FROM base
+),
+legs AS (
+  SELECT d, buyer_firm_id AS firm_id, buyer_name AS firm_name, "TradeNum", qty, value, placement_part, circulation_part
+  FROM classified
+  UNION ALL
+  SELECT d, seller_firm_id, seller_name, "TradeNum", qty, value, placement_part, circulation_part
+  FROM classified
+),
+by_participant_day AS (
+  SELECT
+    d,
+    COALESCE(NULLIF(TRIM(firm_id::text), ''), firm_name) AS part_key,
+    MAX(firm_name) AS firm_name,
+    COUNT(DISTINCT "TradeNum")::bigint AS deal_count,
+    SUM(qty)::numeric AS qty_securities,
+    SUM(placement_part)::numeric AS sum_placement,
+    SUM(circulation_part)::numeric AS sum_circulation,
+    SUM(value)::numeric AS sum_total
+  FROM legs
+  WHERE firm_name IS NOT NULL AND TRIM(firm_name) <> ''
+  GROUP BY d, COALESCE(NULLIF(TRIM(firm_id::text), ''), firm_name)
+),
+ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY d ORDER BY sum_total DESC NULLS LAST) AS rnk
+  FROM by_participant_day
+)
+SELECT
+  ROW_NUMBER() OVER (ORDER BY d ASC, rnk ASC)::text AS id,
+  rnk AS "seqNo",
+  to_char(d, 'YYYY-MM-DD') AS "tradeDate",
+  firm_name AS "participantName",
+  deal_count AS "dealCount",
+  ROUND(qty_securities, 0) AS "secQty",
+  ROUND(sum_placement, 2) AS "amountPlacement",
+  ROUND(sum_circulation, 2) AS "amountCirculation",
+  ROUND(sum_total, 2) AS "amountTotal"
+FROM ranked
+WHERE rnk <= 5
+ORDER BY d ASC, rnk ASC
+`.trim();
+
+/**
+ * Госхолдинг Форма 9 — Информация о торгах (котировки / приказы).
+ * Каждая строка — одна сделка: код ЦБ, кол-во, цена покупки, цена продажи, дата и время.
+ */
+const stateHoldingForm9Query = `
+SELECT
+  b."SecCode"                                     AS "secCode",
+  COALESCE(sec."SecFullName", b."SecCode")        AS "secFullName",
+  to_char(b."TradeDate", 'YYYY-MM-DD')            AS "tradeDate",
+  SUM(b."Qty")                                    AS "quantity",
+  ROUND(AVG(b."Price"), 2)                        AS "buyPrice",
+  ROUND(AVG(s."Price"), 2)                        AS "sellPrice"
+FROM "Trades" b
+JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+GROUP BY b."SecCode", sec."SecFullName", b."TradeDate"
+ORDER BY b."TradeDate", b."SecCode"
+`.trim();
+
+/**
+ * Госхолдинг Форма 8 — Список ценных бумаг, допущенных к обращению через торговую систему фондовой биржи.
+ * Рыночная цена — средневзвешенная по сделкам за выбранный период.
+ * Листинг/нелистинг — определяется по коду класса.
+ */
+const stateHoldingForm8Query = `
+WITH latest_prices AS (
+  SELECT
+    t."SecCode",
+    ROUND(SUM(t."Price" * t."Qty") / NULLIF(SUM(t."Qty"), 0), 2) AS "marketPrice"
+  FROM "Trades" t
+  WHERE t."Operation" = 'Купля'
+    AND t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+  GROUP BY t."SecCode"
+)
+SELECT
+  COALESCE(NULLIF(TRIM(sec."SecFullName"), ''), sec."SecCode") AS "secFullName",
+  sec."SecCode" AS "secCode",
+  COALESCE(NULLIF(TRIM(sec."ISINCode"), ''), sec."SecCode") AS "isinCode",
+  sec."ClassCode" AS "classCode",
+  COALESCE(cl."ClassName", sec."ClassCode") AS "secType",
+  COALESCE(sec."FaceValue", 0) AS "faceValue",
+  COALESCE(lp."marketPrice", 0) AS "marketPrice",
+  CASE
+    WHEN LOWER(COALESCE(cl."ClassName", sec."ClassCode")) LIKE '%листинг%'
+      OR sec."ClassCode" IN ('LISTEDBONDS', 'LISTEDSTOCKK')
+    THEN 'Листинг'
+    ELSE 'Нелистинг'
+  END AS "listingType"
+FROM "Securities" sec
+LEFT JOIN "Classes" cl ON cl."ClassCode" = sec."ClassCode"
+LEFT JOIN latest_prices lp ON lp."SecCode" = sec."SecCode"
+ORDER BY sec."ClassCode", sec."SecFullName"
+`.trim();
+
+/**
+ * Госхолдинг Форма 7 — Отчет о сделках по брокерским и дилерским фирмам.
+ * Группировка: Брокер → ЦБ → Дата.
+ * Колонки: Наименование ЦБ, Дата, Гос.рег.номер, Кол-во сделок, Кол-во ЦБ, max/min/средняя цена, Объём.
+ */
+const stateHoldingForm7Query = `
+SELECT
+  s."FirmId" AS "brokerCode",
+  COALESCE(NULLIF(TRIM(sf."FirmName"), ''), s."FirmName") AS "brokerName",
+  b."SecCode" AS "secCode",
+  COALESCE(sec."SecFullName", b."SecCode") AS "secFullName",
+  COALESCE(NULLIF(TRIM(sec."ISINCode"), ''), b."SecCode") AS "isinCode",
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  COUNT(DISTINCT b."TradeNum") AS "dealCount",
+  SUM(b."Qty") AS "quantity",
+  MAX(b."Price") AS "maxPrice",
+  MIN(b."Price") AS "minPrice",
+  ROUND(SUM(b."Price" * b."Qty") / NULLIF(SUM(b."Qty"), 0), 2) AS "avgPrice",
+  SUM(b."Value") AS "volume"
+FROM "Trades" b
+JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
+LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+WHERE b."Operation" = 'Купля'
+  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+GROUP BY s."FirmId", sf."FirmName", s."FirmName", b."SecCode", sec."SecFullName", sec."ISINCode", b."TradeDate"
+ORDER BY "brokerCode", "secCode", "tradeDate"
+`.trim();
+
+/**
  * SQL для формы F7 — отчёт по сделкам: Сектор → Ценная бумага → Дата.
  * Агрегация: кол-во сделок, кол-во ЦБ, max/min/средняя цена, объём.
  */
@@ -605,6 +776,54 @@ export const reportDefinitions: ReportDefinition[] = [
     description: 'Отчет USD',
     type: 'table',
     category: 'Отчеты по системной информации',
+  },
+  {
+    code: 'StateHolding_Form5_Top5',
+    name: 'StateHolding_Form5_Top5',
+    description:
+      'Форма 5 — сведения о 5 участниках торгов с наибольшей суммой сделок в сомах (по рабочим дням периода)',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
+    sql: stateHoldingForm5Top5Query,
+  },
+  {
+    code: 'StateHolding_Form6',
+    name: 'StateHolding_Form6',
+    description: 'Форма 6 — Отчет о сделках (первичный/вторичный рынок, листинг)',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'StateHolding_Form7',
+    name: 'StateHolding_Form7',
+    description: 'Форма 7 — Отчет о сделках по брокерским и дилерским фирмам',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
+    sql: stateHoldingForm7Query,
+  },
+  {
+    code: 'StateHolding_Form8',
+    name: 'StateHolding_Form8',
+    description: 'Форма 8 — Список ценных бумаг, допущенных к обращению через торговую систему фондовой биржи',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
+    sql: stateHoldingForm8Query,
+  },
+  {
+    code: 'StateHolding_Form9',
+    name: 'StateHolding_Form9',
+    description: 'Форма 9 — Информация о торгах (котировки, приказы)',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
+    sql: stateHoldingForm9Query,
+  },
+  {
+    code: 'StateHolding_Form10',
+    name: 'StateHolding_Form10',
+    description: 'Форма 10 — Значение индекса за торговый день',
+    type: 'table',
+    category: 'Отчеты госхолдинг',
   },
   {
     code: 'Auction_Summary',

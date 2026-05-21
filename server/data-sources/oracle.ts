@@ -8,8 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // - 'java' на Windows (берётся из PATH / App Execution Aliases)
 // - '/usr/bin/java' в Linux (как в Docker-образе)
 const JAVA_BIN = process.env.JAVA_BIN || (process.platform === 'win32' ? 'java' : '/usr/bin/java');
-// Из dist (`server/dist/data-sources`) поднимаемся на уровень `server` и идём в `oracle-bridge`
-const BRIDGE_DIR = path.join(__dirname, '..', '..', 'oracle-bridge');
+// В prod-сборке: __dirname = server/dist/data-sources → ../../oracle-bridge = server/oracle-bridge
+// В dev (tsx):   __dirname = server/data-sources     →  ../oracle-bridge  = server/oracle-bridge
+const isDist = __dirname.includes(path.sep + 'dist' + path.sep);
+const BRIDGE_DIR = isDist
+  ? path.join(__dirname, '..', '..', 'oracle-bridge')
+  : path.join(__dirname, '..', 'oracle-bridge');
 const defaultJdbc =
   process.platform === 'win32'
     ? 'C:\\oracle\\ora81\\jdbc\\lib\\classes12.zip;C:\\oracle\\ora81\\jdbc\\lib\\nls_charset12.zip'
@@ -125,6 +129,23 @@ export interface GoldContractRow {
   buyer_name?: string | null;
   buy_account?: string | null;
   buyer_trader?: string | null;
+}
+
+export interface IndexRow {
+  index_date: string;
+  index_value: number;
+}
+
+export async function queryOracleIndex(
+  dateFrom: string,
+  dateTo: string,
+): Promise<IndexRow[]> {
+  const raw = await runJavaBridge('OracleIndexQuery', [dateFrom, dateTo]);
+  const rows = JSON.parse(raw) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    index_date:  String(r.index_date  ?? ''),
+    index_value: Number(r.index_value ?? 0),
+  }));
 }
 
 export async function queryOracleGold(

@@ -110,6 +110,15 @@ export function runGoldReport(dateFrom: string, dateTo: string, ownId?: number):
   return api.post('/reports/gold', { dateFrom, dateTo, ownId });
 }
 
+export interface IndexRow {
+  index_date: string;
+  index_value: number;
+}
+
+export function runIndexReport(dateFrom: string, dateTo: string): Promise<{ rows: IndexRow[] }> {
+  return api.post('/reports/index', { dateFrom, dateTo });
+}
+
 export interface TodayTrade {
   id: string;
   tradeDate: string;

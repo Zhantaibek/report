@@ -5,7 +5,7 @@ import { reportToXlsxBuffer } from '../reports/export/xlsx.js';
 import { reportToCsv } from '../reports/export/csv.js';
 import { getDataSources } from '../config/data-sources.js';
 import { getSecurities, getClasses, getFirms, runCustomSqlQuery } from '../data-sources/index.js';
-import { queryOracleUsd, queryOracleInstruments, queryOracleGold } from '../data-sources/oracle.js';
+import { queryOracleUsd, queryOracleInstruments, queryOracleGold, queryOracleIndex } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
 import { baseTradesQuery } from '../reports/report-definitions.js';
 import { calculateCommissionForTrade } from '../reports/commission-engine.js';
@@ -186,6 +186,21 @@ router.post('/gold', async (req, res) => {
     res.json({ rows });
   } catch (err) {
     console.error('[/api/reports/gold]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
+  }
+});
+
+router.post('/index', async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.body ?? {};
+    if (!dateFrom || !dateTo) {
+      res.status(400).json({ error: 'dateFrom and dateTo required' });
+      return;
+    }
+    const rows = await queryOracleIndex(dateFrom, dateTo);
+    res.json({ rows });
+  } catch (err) {
+    console.error('[/api/reports/index]', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
   }
 });

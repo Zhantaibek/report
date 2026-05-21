@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check, ChevronDown, ChevronUp, Loader2, Search } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Search } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 
 const Select = SelectPrimitive.Root;
@@ -179,6 +179,8 @@ function SelectWithSearch({
 }: SelectWithSearchProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  /** true = группа свёрнута */
+  const [groupCollapsed, setGroupCollapsed] = React.useState<Record<string, boolean>>({});
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -233,6 +235,20 @@ function SelectWithSearch({
     ?.map((g) => ({ ...g, options: g.options.filter(matchesSearch) }))
     .filter((g) => g.options.length > 0);
 
+  const searchActive = Boolean(search.trim());
+
+  const isGroupExpanded = React.useCallback(
+    (label: string) => {
+      if (searchActive) return true;
+      return groupCollapsed[label] !== true;
+    },
+    [groupCollapsed, searchActive],
+  );
+
+  const toggleGroup = React.useCallback((label: string) => {
+    setGroupCollapsed((prev) => ({ ...prev, [label]: prev[label] !== true }));
+  }, []);
+
   const hasResults =
     (filteredOptions && filteredOptions.length > 0) ||
     (filteredGroups && filteredGroups.length > 0);
@@ -275,19 +291,19 @@ function SelectWithSearch({
       {open && (
         <div
           ref={listRef}
-          className="absolute z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md max-w-full"
+          className="absolute left-0 z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md"
           style={{
             maxHeight: '18rem',
             display: 'flex',
             flexDirection: 'column',
-            width: '100%',
             minWidth: '100%',
+            width: 'max-content',
             maxWidth: 'min(42rem, calc(100vw - 2rem))',
           }}
         >
           {/* Search input */}
           {withSearch && (
-            <div className="flex items-center gap-1.5 border-b px-2 py-1.5 shrink-0">
+            <div className="flex items-center gap-1.5 border-b pl-2 pr-4 py-1.5 shrink-0">
               <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <input
                 ref={inputRef}
@@ -303,7 +319,7 @@ function SelectWithSearch({
           )}
 
           {/* List */}
-          <div className="overflow-y-auto p-1.5">
+          <div className="overflow-y-auto py-1.5 pl-1.5 pr-4 [scrollbar-gutter:stable]">
             {!hasResults && (
               <div className="py-4 text-center text-sm text-muted-foreground">Ничего не найдено</div>
             )}
@@ -317,46 +333,68 @@ function SelectWithSearch({
                   title={opt.label}
                   onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                   className={cn(
-                    'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
+                    'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
                     selected && 'bg-muted'
                   )}
                 >
                   <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
                     {selected && <Check className="h-4 w-4" />}
                   </span>
-                  <span className="block min-w-0 truncate">{opt.label}</span>
+                  <span className="block min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
                 </div>
               );
             })}
 
-            {/* Сгруппированный список */}
-            {filteredGroups?.map((g) => (
-              <div key={g.label}>
-                <div className="flex items-center px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {g.icon}
-                  {g.label}
-                </div>
-                {g.options.map((opt) => {
-                  const selected = multiple ? (values ?? []).includes(opt.value) : opt.value === value;
-                  return (
-                    <div
-                      key={opt.value}
-                      title={opt.label}
-                      onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
-                      className={cn(
-                        'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-3 text-sm font-normal outline-none hover:bg-muted',
-                        selected && 'bg-muted'
+            {/* Сгруппированный список (заголовок группы раскрывает/сворачивает опции) */}
+            {filteredGroups?.map((g) => {
+              const expanded = isGroupExpanded(g.label);
+              return (
+                <div key={g.label}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleGroup(g.label);
+                    }}
+                    className="flex w-full flex-wrap items-center gap-1.5 rounded-md pl-2 pr-4 py-1.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground outline-none hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center text-foreground/70">
+                      {expanded ? (
+                        <ChevronDown className="pointer-events-none h-4 w-4 shrink-0" aria-hidden />
+                      ) : (
+                        <ChevronRight className="pointer-events-none h-4 w-4 shrink-0" aria-hidden />
                       )}
-                    >
-                      <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
-                        {selected && <Check className="h-4 w-4" />}
-                      </span>
-                      <span className="block min-w-0 truncate">{opt.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+                    </span>
+                    <span className="pointer-events-none shrink-0 [&_svg]:pointer-events-none">{g.icon}</span>
+                    <span className="min-w-0 flex-1 whitespace-normal break-words">{g.label}</span>
+                  </button>
+                  {expanded &&
+                    g.options.map((opt) => {
+                      const selected = multiple ? (values ?? []).includes(opt.value) : opt.value === value;
+                      return (
+                        <div
+                          key={opt.value}
+                          title={opt.label}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelect(opt.value);
+                          }}
+                          className={cn(
+                            'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
+                            selected && 'bg-muted',
+                          )}
+                        >
+                          <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+                            {selected && <Check className="h-4 w-4" />}
+                          </span>
+                          <span className="block min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
