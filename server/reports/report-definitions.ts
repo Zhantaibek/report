@@ -16,6 +16,26 @@ function normalizeReportCode(code: string): string {
   return code.trim().toLowerCase();
 }
 
+/** CTE: одна строка на TradeNum для ноги сделки (защита от дублей QUIK Export). */
+function cteDedupTradeLeg(
+  alias: string,
+  operation: 'Купля' | 'Продажа',
+  dateBetween: string,
+): string {
+  return `${alias} AS (
+  SELECT DISTINCT ON (t."TradeNum")
+    t.*
+  FROM "Trades" t
+  WHERE t."Operation" = '${operation}'
+    AND ${dateBetween}
+  ORDER BY t."TradeNum", t."TradeDate" DESC
+)`;
+}
+
+const TRADES_DATE_BETWEEN = 't."TradeDate" BETWEEN $1 AND $2';
+const TRADES_DATE_BETWEEN_COALESCE = 't."TradeDate" BETWEEN $1 AND COALESCE($2, $1)';
+const TRADES_DATE_BETWEEN_COALESCE_DATE = 't."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)';
+
 /**
  * Базовый SQL-запрос для получения уникальных сделок.
  * Продавец/покупатель через JOIN по Operation (Купля/Продажа).
@@ -23,6 +43,9 @@ function normalizeReportCode(code: string): string {
  * Экспортируется, т.к. используется также в dashboard‑эндпоинтах.
  */
 export const baseTradesQuery = `
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN)},
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN)}
 SELECT
   b."TradeNum" AS "id",
   b."FirmId"   AS "buyerId",
@@ -43,14 +66,12 @@ SELECT
   b."Price" AS "price",
   b."Qty" AS "quantity",
   b."Value" AS "value"
-FROM "Trades" b
-JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+FROM buy_trades b
+JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
 LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
 LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
 LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-WHERE b."Operation" = 'Купля'
-  AND b."TradeDate" BETWEEN $1 AND $2
 ORDER BY b."ClassCode", b."SecCode", b."TradeDate", b."TradeNum"
 `.trim();
 
@@ -502,14 +523,13 @@ WITH index_universe AS (
        AND LOWER(COALESCE(cl."ClassName", sec."ClassCode", '')) LIKE '%акц%'
      )
 ),
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
 period_weights AS (
   SELECT
     t."SecCode",
     SUM(t."Qty")::numeric AS qty_weight
-  FROM "Trades" t
+  FROM buy_trades t
   INNER JOIN index_universe u ON u."SecCode" = t."SecCode"
-  WHERE t."Operation" = 'Купля'
-    AND t."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
   GROUP BY t."SecCode"
   HAVING SUM(t."Qty") > 0
 ),
@@ -518,10 +538,8 @@ daily_vwap AS (
     t."TradeDate"::date AS d,
     t."SecCode",
     SUM(t."Price" * t."Qty") / NULLIF(SUM(t."Qty"), 0) AS vwap
-  FROM "Trades" t
+  FROM buy_trades t
   INNER JOIN index_universe u ON u."SecCode" = t."SecCode"
-  WHERE t."Operation" = 'Купля'
-    AND t."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
   GROUP BY t."TradeDate"::date, t."SecCode"
 ),
 daily_cap AS (
@@ -558,7 +576,10 @@ ORDER BY dc.d
  * Размещение / обращение — по ключевым словам в названии класса инструмента.
  */
 const stateHoldingForm5Top5Query = `
-WITH base AS (
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+base AS (
   SELECT
     b."TradeNum",
     b."TradeDate"::date AS d,
@@ -569,13 +590,11 @@ WITH base AS (
     b."Qty" AS qty,
     b."Value" AS value,
     LOWER(COALESCE(cl."ClassName", b."ClassCode", '')) AS class_l
-  FROM "Trades" b
-  JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+  FROM buy_trades b
+  JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
   LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
   LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
   LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
-  WHERE b."Operation" = 'Купля'
-    AND b."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)
 ),
 classified AS (
   SELECT
@@ -643,6 +662,9 @@ ORDER BY d ASC, rnk ASC
  * Каждая строка — одна сделка: код ЦБ, кол-во, цена покупки, цена продажи, дата и время.
  */
 const stateHoldingForm9Query = `
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)}
 SELECT
   b."SecCode"                                     AS "secCode",
   COALESCE(sec."SecFullName", b."SecCode")        AS "secFullName",
@@ -650,11 +672,9 @@ SELECT
   SUM(b."Qty")                                    AS "quantity",
   ROUND(AVG(b."Price"), 2)                        AS "buyPrice",
   ROUND(AVG(s."Price"), 2)                        AS "sellPrice"
-FROM "Trades" b
-JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+FROM buy_trades b
+JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-WHERE b."Operation" = 'Купля'
-  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
 GROUP BY b."SecCode", sec."SecFullName", b."TradeDate"
 ORDER BY b."TradeDate", b."SecCode"
 `.trim();
@@ -665,13 +685,13 @@ ORDER BY b."TradeDate", b."SecCode"
  * Листинг/нелистинг — определяется по коду класса.
  */
 const stateHoldingForm8Query = `
-WITH latest_prices AS (
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+latest_prices AS (
   SELECT
     t."SecCode",
     ROUND(SUM(t."Price" * t."Qty") / NULLIF(SUM(t."Qty"), 0), 2) AS "marketPrice"
-  FROM "Trades" t
-  WHERE t."Operation" = 'Купля'
-    AND t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+  FROM buy_trades t
   GROUP BY t."SecCode"
 )
 SELECT
@@ -700,6 +720,9 @@ ORDER BY sec."ClassCode", sec."SecFullName"
  * Колонки: Наименование ЦБ, Дата, Гос.рег.номер, Кол-во сделок, Кол-во ЦБ, max/min/средняя цена, Объём.
  */
 const stateHoldingForm7Query = `
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)}
 SELECT
   s."FirmId" AS "brokerCode",
   COALESCE(NULLIF(TRIM(sf."FirmName"), ''), s."FirmName") AS "brokerName",
@@ -713,12 +736,10 @@ SELECT
   MIN(b."Price") AS "minPrice",
   ROUND(SUM(b."Price" * b."Qty") / NULLIF(SUM(b."Qty"), 0), 2) AS "avgPrice",
   SUM(b."Value") AS "volume"
-FROM "Trades" b
-JOIN "Trades" s ON b."TradeNum" = s."TradeNum" AND s."Operation" = 'Продажа'
+FROM buy_trades b
+JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
 LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-WHERE b."Operation" = 'Купля'
-  AND b."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
 GROUP BY s."FirmId", sf."FirmName", s."FirmName", b."SecCode", sec."SecFullName", sec."ISINCode", b."TradeDate"
 ORDER BY "brokerCode", "secCode", "tradeDate"
 `.trim();

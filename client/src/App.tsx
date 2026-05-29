@@ -7,8 +7,10 @@ import Dashboard from './pages/Dashboard.tsx';
 import Reports from './pages/Reports.tsx';
 import Users from './pages/admin/Users.tsx';
 import ReportFormsAdmin from './pages/admin/ReportForms.tsx';
+import Reference from './pages/admin/Reference.tsx';
 import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
 import CurrencyRates from './pages/admin/CurrencyRates.tsx';
+import Securities from './pages/admin/Securities.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -68,21 +70,20 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/commission-tariffs"
+          path="/admin/reference"
           element={
             <ProtectedRoute>
-              <AdminRoute><CommissionTariffs /></AdminRoute>
+              <AdminRoute><Reference /></AdminRoute>
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/admin/currency-rates"
-          element={
-            <ProtectedRoute>
-              <AdminRoute><CurrencyRates /></AdminRoute>
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="tariffs" replace />} />
+          <Route path="tariffs" element={<CommissionTariffs />} />
+          <Route path="currency-rates" element={<CurrencyRates />} />
+          <Route path="securities" element={<Securities />} />
+        </Route>
+        <Route path="/admin/commission-tariffs" element={<Navigate to="/admin/reference/tariffs" replace />} />
+        <Route path="/admin/currency-rates" element={<Navigate to="/admin/reference/currency-rates" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

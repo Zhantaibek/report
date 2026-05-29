@@ -1,8 +1,14 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { SelectWithSearch, type SelectOptionGroup } from '../components/ui/select.tsx';
-import { Play, Printer, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText, Building2 } from 'lucide-react';
+import { Play, Printer, RotateCcw, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText, Building2, History } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.tsx';
+import {
+  loadReportRunHistory,
+  saveReportRun,
+  type SavedReportRun,
+} from '../lib/report-run-history.ts';
 import { getReportForms } from '../api/report-forms.ts';
 import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
@@ -210,7 +216,64 @@ function calcTotalsWithUnique(
   };
 }
 
+function formatRunDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('ru-RU');
+}
+
+function formatSavedAt(ts: number): string {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function countReportResult(
+  res: ReportResult | null,
+  usd: UsdReportRow[] | null,
+  gold: GoldContractRow[] | null,
+): number {
+  if (usd != null) return usd.length;
+  if (gold != null) return gold.length;
+  if (!res) return 0;
+  if (res.type === 'table' || res.type === 'summary') return res.rows.length;
+  if (res.type === 'chart') return res.labels.length;
+  return 0;
+}
+
+function buildRunSummary(
+  form: ReportForm,
+  filters: RunFilters,
+  selectedOwnId?: number,
+  oracleInstruments?: OracleInstrument[],
+): string {
+  const parts: string[] = [];
+  if (filters.dateFrom) {
+    if (form.singleDate || filters.dateFrom === filters.dateTo) {
+      parts.push(formatRunDate(filters.dateFrom));
+    } else {
+      parts.push(`${formatRunDate(filters.dateFrom)} – ${formatRunDate(filters.dateTo)}`);
+    }
+  }
+  if (filters.classCode) parts.push(`класс: ${filters.classCode}`);
+  if (filters.instrument) parts.push(`инстр.: ${filters.instrument}`);
+  if (filters.firmCode) parts.push(`участн.: ${filters.firmCode}`);
+  if (selectedOwnId != null) {
+    const inv = oracleInstruments?.find((i) => i.id === selectedOwnId);
+    if (inv) parts.push(inv.extcode || inv.namerus);
+  }
+  return parts.join(' · ');
+}
+
 export default function Reports() {
+  const { user } = useAuth();
+  const historyUserKey = user?.login ?? user?.id?.toString() ?? 'guest';
   const [forms, setForms] = useState<ReportForm[]>([]);
   const [firms, setFirms] = useState<FirmItem[]>([]);
   const [securities, setSecurities] = useState<SecurityItem[]>([]);
@@ -231,7 +294,12 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [recentRuns, setRecentRuns] = useState<SavedReportRun[]>([]);
   const limit = 20;
+
+  useEffect(() => {
+    setRecentRuns(loadReportRunHistory(historyUserKey));
+  }, [historyUserKey]);
 
   useEffect(() => {
     getReportForms().then(setForms).catch(() => {});
@@ -239,6 +307,102 @@ export default function Reports() {
     getSecurities().then(setSecurities).catch(() => {});
     getClasses().then(setClasses).catch(() => {});
   }, []);
+
+  const persistRunToHistory = useCallback(
+    (resultCount: number) => {
+      const form = forms.find((f) => String(f.id) === selectedFormId);
+      if (!form || !filters.dateFrom || !filters.dateTo) return;
+      const entry: SavedReportRun = {
+        id: `${Date.now()}-${selectedFormId}`,
+        savedAt: Date.now(),
+        reportFormId: selectedFormId,
+        reportFormLabel: (form.description || form.name || '').trim(),
+        filters: { ...filters },
+        selectedOwnId,
+        summary: buildRunSummary(form, filters, selectedOwnId, oracleInstruments),
+        resultCount,
+      };
+      setRecentRuns(saveReportRun(historyUserKey, entry));
+    },
+    [forms, selectedFormId, filters, selectedOwnId, oracleInstruments, historyUserKey],
+  );
+
+  const filtersFromSavedEntry = useCallback((entry: SavedReportRun): RunFilters | null => {
+    const form = forms.find((f) => String(f.id) === entry.reportFormId);
+    if (!form) return null;
+    const mode = FORM_META[form.code]?.filterMode ?? 'quik';
+    const restored: RunFilters = {
+      dateFrom: entry.filters.dateFrom,
+      dateTo: entry.filters.dateTo,
+    };
+    if (mode === 'quik') {
+      restored.classCode = entry.filters.classCode;
+      restored.instrument = entry.filters.instrument;
+      restored.firmCode = entry.filters.firmCode;
+    } else if (mode === 'firm') {
+      restored.firmCode = entry.filters.firmCode;
+    }
+    return restored;
+  }, [forms]);
+
+  const applySavedRun = useCallback(
+    async (entry: SavedReportRun) => {
+      const form = forms.find((f) => String(f.id) === entry.reportFormId);
+      if (!form) return;
+      const restored = filtersFromSavedEntry(entry);
+      if (!restored) return;
+      const mode = FORM_META[form.code]?.filterMode ?? 'quik';
+      setSelectedFormId(entry.reportFormId);
+      setFilters(restored);
+      setSelectedOwnId(mode === 'oracle' ? entry.selectedOwnId : undefined);
+      setResult(null);
+      setUsdRows(null);
+      setGoldRows(null);
+      setPage(1);
+      setRunError(null);
+      setValidationError(null);
+      if (mode === 'oracle') {
+        setLoadingInstruments(true);
+        try {
+          const list = await getOracleInstruments();
+          setOracleInstruments(list);
+        } catch {
+          /* ignore */
+        } finally {
+          setLoadingInstruments(false);
+        }
+      }
+    },
+    [forms, filtersFromSavedEntry],
+  );
+
+  const executeRun = useCallback(
+    async (reportFormId: string, runFilters: RunFilters, ownId?: number): Promise<number> => {
+      const form = forms.find((f) => String(f.id) === reportFormId);
+      const meta = form ? FORM_META[form.code] : undefined;
+      const ds = meta?.dataSource ?? 'quik';
+      if (ds === 'usd') {
+        const res = await runUsdReport(runFilters.dateFrom!, runFilters.dateTo!, ownId);
+        setUsdRows(res.rows);
+        setResult(null);
+        setGoldRows(null);
+        return res.rows.length;
+      }
+      if (ds === 'gold') {
+        const res = await runGoldReport(runFilters.dateFrom!, runFilters.dateTo!, ownId);
+        setGoldRows(res.rows);
+        setResult(null);
+        setUsdRows(null);
+        return res.rows.length;
+      }
+      const res = await runReport({ reportFormId: Number(reportFormId), filters: runFilters });
+      setResult(res);
+      setUsdRows(null);
+      setGoldRows(null);
+      return countReportResult(res, null, null);
+    },
+    [forms],
+  );
 
   const run = async () => {
     if (!selectedFormId) return;
@@ -253,19 +417,46 @@ export default function Reports() {
     setUsdRows(null);
     setGoldRows(null);
     try {
-      const ds = selectedFormMeta?.dataSource ?? 'quik';
-      if (ds === 'usd') {
-        const res = await runUsdReport(filters.dateFrom, filters.dateTo, selectedOwnId);
-        setUsdRows(res.rows);
-        setResult(null);
-      } else if (ds === 'gold') {
-        const res = await runGoldReport(filters.dateFrom, filters.dateTo, selectedOwnId);
-        setGoldRows(res.rows);
-        setResult(null);
-      } else {
-        const res = await runReport({ reportFormId: Number(selectedFormId), filters });
-        setResult(res);
-      }
+      const resultCount = await executeRun(selectedFormId, filters, selectedOwnId);
+      persistRunToHistory(resultCount);
+    } catch (err) {
+      console.error(err);
+      setResult(null);
+      setUsdRows(null);
+      setGoldRows(null);
+      setRunError(err instanceof Error ? err.message : 'Ошибка при формировании отчёта');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runFromSavedEntry = async (entry: SavedReportRun) => {
+    const restored = filtersFromSavedEntry(entry);
+    if (!restored?.dateFrom || !restored.dateTo) return;
+    const form = forms.find((f) => String(f.id) === entry.reportFormId);
+    if (!form) return;
+    const mode = FORM_META[form.code]?.filterMode ?? 'quik';
+    const ownId = mode === 'oracle' ? entry.selectedOwnId : undefined;
+    setLoading(true);
+    setRunError(null);
+    setValidationError(null);
+    setPage(1);
+    setUsdRows(null);
+    setGoldRows(null);
+    try {
+      await applySavedRun(entry);
+      const resultCount = await executeRun(entry.reportFormId, restored, ownId);
+      const historyEntry: SavedReportRun = {
+        id: `${Date.now()}-${entry.reportFormId}`,
+        savedAt: Date.now(),
+        reportFormId: entry.reportFormId,
+        reportFormLabel: entry.reportFormLabel,
+        filters: restored,
+        selectedOwnId: ownId,
+        summary: entry.summary,
+        resultCount,
+      };
+      setRecentRuns(saveReportRun(historyUserKey, historyEntry));
     } catch (err) {
       console.error(err);
       setResult(null);
@@ -308,6 +499,19 @@ export default function Reports() {
 
   /** Режим фильтров текущей формы. */
   const filterMode = selectedFormMeta?.filterMode ?? 'quik';
+
+  /** Пользователь сам заполнил форму и период — список недавних скрываем. */
+  const userFilledAllParams = Boolean(
+    selectedFormId && filters.dateFrom && filters.dateTo,
+  );
+  const showRecentRuns = recentRuns.length > 0 && !userFilledAllParams;
+
+  const showPostRunActions = Boolean(
+    selectedFormMeta?.customView &&
+      ((result != null && (result.type !== 'table' || result.rows.length > 0)) ||
+        (usdRows != null && usdRows.length > 0) ||
+        (goldRows != null && goldRows.length > 0)),
+  );
   const filterRow1GridClass = filterMode === 'none' ? 'grid grid-cols-1 gap-4' : filterMode === 'firm' ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-4 gap-4';
 
   const handlePrint = () => {
@@ -316,6 +520,18 @@ export default function Reports() {
       window.print();
       setIsPrinting(false);
     }, 100);
+  };
+
+  const handleReset = () => {
+    setSelectedFormId('');
+    setFilters({ dateFrom: undefined, dateTo: undefined });
+    setSelectedOwnId(undefined);
+    setResult(null);
+    setUsdRows(null);
+    setGoldRows(null);
+    setPage(1);
+    setRunError(null);
+    setValidationError(null);
   };
 
   // Группировка данных для Blank_Form_1 с пагинацией
@@ -1080,7 +1296,23 @@ export default function Reports() {
 
               {/* Кнопки */}
               <div className="flex items-end justify-end gap-2">
-                <Button onClick={run} disabled={!selectedFormId || loading}>
+                {showPostRunActions && (
+                  <>
+                    <Button variant="secondary" onClick={handlePrint}>
+                      <Printer className="h-4 w-4 mr-1.5" />
+                      Печать
+                    </Button>
+                    <Button variant="secondary" onClick={handleReset} disabled={loading}>
+                      <RotateCcw className="h-4 w-4 mr-1.5" />
+                      Сброс
+                    </Button>
+                  </>
+                )}
+                <Button
+                  className="w-[9.75rem]"
+                  onClick={run}
+                  disabled={!selectedFormId || loading}
+                >
                   {loading ? 'Загрузка…' : (
                     <>
                       <Play className="h-4 w-4 mr-1.5" />
@@ -1088,16 +1320,6 @@ export default function Reports() {
                     </>
                   )}
                 </Button>
-                {(selectedFormMeta?.customView && (
-                  (result != null && (result.type !== 'table' || result.rows.length > 0)) ||
-                  (usdRows != null && usdRows.length > 0) ||
-                  (goldRows != null && goldRows.length > 0)
-                )) && (
-                  <Button variant="secondary" size="sm" onClick={handlePrint}>
-                    <Printer className="h-4 w-4 mr-1.5" />
-                    Печать
-                  </Button>
-                )}
               </div>
             </div>
 
@@ -1110,6 +1332,7 @@ export default function Reports() {
                 onPageChange={setPage}
               />
             )}
+
           </div>
           {validationError && (
             <div className="mt-4">
@@ -1176,6 +1399,55 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+
+      {showRecentRuns && (
+        <div className="mt-6 print:hidden">
+          <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#3d848c' }}>
+            Недавние отчёты
+          </p>
+          <div className="flex flex-col gap-2">
+            {recentRuns.map((entry) => {
+              const formMissing = !forms.some((f) => String(f.id) === entry.reportFormId);
+              const savedAtLabel = formatSavedAt(entry.savedAt);
+              return (
+                <div
+                  key={entry.id}
+                  className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+                >
+                  <History className="h-4 w-4 shrink-0 text-[#3d848c]" />
+                  <div className="min-w-0 flex-1 flex flex-col gap-1">
+                    <p className="font-medium leading-snug break-words">{entry.reportFormLabel}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                      {entry.summary && <span>{entry.summary}</span>}
+                      {entry.resultCount === 0 && (
+                        <span className="text-amber-700 dark:text-amber-500">нет данных</span>
+                      )}
+                      {entry.resultCount != null && entry.resultCount > 0 && (
+                        <span className="text-green-700 dark:text-green-500">
+                          записей: {entry.resultCount}
+                        </span>
+                      )}
+                      {savedAtLabel && (
+                        <span className="tabular-nums text-[#3d848c] dark:text-[#6eb8bf]">
+                          {savedAtLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => runFromSavedEntry(entry)}
+                    disabled={loading || formMissing}
+                    className="shrink-0 text-sm font-medium text-[#3d848c] hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                  >
+                    Сформировать
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

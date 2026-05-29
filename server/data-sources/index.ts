@@ -24,6 +24,7 @@ export interface SecurityItem {
   secCode: string;
   classCode: string;
   secFullName: string;
+  isinCode: string;
 }
 
 export interface ClassItem {
@@ -195,12 +196,13 @@ export async function getSecurities(dataSourceId: number): Promise<SecurityItem[
   const ds = await getDataSourceById(dataSourceId);
   if (!ds || !ds.is_active) return [];
   try {
-    const rows = await queryDs(ds, `SELECT "SecCode", "ClassCode", "SecFullName" FROM "Securities" ORDER BY "ClassCode", "SecCode"`);
+    const rows = await queryDs(ds, `SELECT "SecCode", "ClassCode", "SecFullName", "ISINCode" FROM "Securities" ORDER BY "ClassCode", "SecFullName", "SecCode"`);
     return rows
       .map((r) => ({
         secCode: String(getField(r, 'SecCode', 'seccode', 'SECCODE') ?? ''),
         classCode: String(getField(r, 'ClassCode', 'classcode', 'CLASSCODE') ?? ''),
         secFullName: String(getField(r, 'SecFullName', 'secfullname', 'SECFULLNAME') ?? ''),
+        isinCode: String(getField(r, 'ISINCode', 'isincode', 'ISINCODE') ?? ''),
       }))
       .filter((s) => s.secCode);
   } catch (e) {

@@ -275,10 +275,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Низ: Торги за сегодня */}
+      {/* Низ: Торги за день */}
       <Card>
         <CardHeader>
-          <CardTitle>Торги за сегодня</CardTitle>
+          <CardTitle>Торги за день</CardTitle>
         </CardHeader>
         <CardContent>
           {todayLoading ? (
@@ -286,7 +286,7 @@ export default function Dashboard() {
           ) : todayError ? (
             <p className="text-sm text-destructive">{todayError}</p>
           ) : todayTrades.length === 0 ? (
-            <p className="text-sm text-muted-foreground">За сегодня сделок не найдено.</p>
+            <p className="text-sm text-muted-foreground">Сделок не найдено.</p>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">

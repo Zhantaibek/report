@@ -18,6 +18,7 @@ export interface SecurityItem {
   secCode: string;
   classCode: string;
   secFullName: string;
+  isinCode: string;
 }
 
 export interface ClassItem {

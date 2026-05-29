@@ -18,7 +18,7 @@ router.get('/securities', async (_req, res) => {
   try {
     const sources = getDataSources(true);
     const results = await Promise.all(sources.map((ds) => getSecurities(ds.id)));
-    const merged = new Map<string, { secCode: string; classCode: string; secFullName: string }>();
+    const merged = new Map<string, { secCode: string; classCode: string; secFullName: string; isinCode: string }>();
     for (const list of results) {
       for (const item of list) {
         if (!merged.has(item.secCode)) merged.set(item.secCode, item);

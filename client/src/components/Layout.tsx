@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Sun, Moon, Monitor } from 'lucide-react';
+import { Home, FileText, Users, BookOpen, LogOut, Sun, Moon, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useTheme, type Theme } from '../context/ThemeContext.tsx';
 
@@ -9,10 +9,19 @@ const THEMES: { value: Theme; icon: React.ReactNode; label: string }[] = [
   { value: 'system', icon: <Monitor size={15} />, label: 'Системная' },
 ];
 
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+    isActive
+      ? 'bg-white text-[#3d848c] shadow-sm'
+      : 'text-white/80 hover:text-white hover:bg-white/15'
+  }`;
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+
+  const isAdmin = user?.role === 'admin';
 
   const cycleTheme = () => {
     const idx = THEMES.findIndex(t => t.value === theme);
@@ -27,13 +36,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const navLinks = [
-    { to: '/', label: 'Главная' },
-    { to: '/reports', label: 'Отчёты' },
-    ...(user?.role === 'admin'
+    { to: '/', label: 'Главная', icon: Home },
+    { to: '/reports', label: 'Отчёты', icon: FileText },
+    ...(isAdmin
       ? [
-          { to: '/admin/users', label: 'Сотрудники' },
-          { to: '/admin/commission-tariffs', label: 'Тарифы' },
-          { to: '/admin/currency-rates', label: 'Курсы валют' },
+          { to: '/admin/users', label: 'Сотрудники', icon: Users },
+          { to: '/admin/reference', label: 'Справочник', icon: BookOpen },
         ]
       : []),
   ];
@@ -42,36 +50,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="shrink-0 print:hidden" style={{ background: 'linear-gradient(90deg, #2d6b72 0%, #3d848c 60%, #4a9da6 100%)', boxShadow: '0 2px 12px rgba(45,107,114,0.25)' }}>
-        <div className="mx-auto flex h-14 max-w-[1200px] items-center">
+        <div className="mx-auto grid h-14 max-w-[1200px] grid-cols-3 items-center px-4">
 
           {/* Logo */}
-          <div className="flex items-center gap-2 mr-8">
+          <div className="flex items-center gap-2">
             <img src="/favicon.png" alt="logo" className="w-7 h-7 object-contain" />
             <span className="text-white font-bold text-sm tracking-wide">QuikReports</span>
           </div>
 
-          {/* Nav */}
-          <nav className="flex items-center gap-1 flex-1">
-            {navLinks.map(({ to, label }) => (
+          {/* Nav — centered */}
+          <nav className="flex items-center justify-center gap-1">
+            {navLinks.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
-                className={({ isActive }) =>
-                  `px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-white text-[#3d848c] shadow-sm'
-                      : 'text-white/80 hover:text-white hover:bg-white/15'
-                  }`
-                }
+                className={linkClass}
               >
+                <Icon size={15} />
                 {label}
               </NavLink>
             ))}
           </nav>
 
           {/* User info + logout */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3">
             <button
               onClick={cycleTheme}
               title={currentTheme.label}
