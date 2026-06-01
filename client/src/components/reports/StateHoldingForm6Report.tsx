@@ -88,7 +88,7 @@ export function StateHoldingForm6Report({ data }: Props) {
       />
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-border text-xs">
+        <table className="w-full border-collapse border border-border text-sm">
           <thead>
             <tr className="bg-muted/60">
               <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>

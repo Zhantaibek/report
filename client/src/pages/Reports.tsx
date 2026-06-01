@@ -87,7 +87,7 @@ type FormDataSource = 'quik' | 'usd' | 'gold';
  *   quik   — Класс + Инструмент + Участник
  *   firm   — только Участник
  *   oracle — выбор инструмента из Oracle
- *   none   — нет дополнительных фильтров (только даты)
+ *   none   — только даты и класс
  */
 type FormFilterMode = 'quik' | 'firm' | 'oracle' | 'none';
 
@@ -512,7 +512,15 @@ export default function Reports() {
         (usdRows != null && usdRows.length > 0) ||
         (goldRows != null && goldRows.length > 0)),
   );
-  const filterRow1GridClass = filterMode === 'none' ? 'grid grid-cols-1 gap-4' : filterMode === 'firm' ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-4 gap-4';
+  const filterRow1GridClass =
+    filterMode === 'none'
+      ? 'grid grid-cols-2 gap-4'
+      : filterMode === 'firm'
+        ? 'grid grid-cols-3 gap-4'
+        : filterMode === 'oracle'
+          ? 'grid grid-cols-1 gap-4'
+          : 'grid grid-cols-4 gap-4';
+  const showClassFilter = filterMode !== 'oracle';
 
   const handlePrint = () => {
     setIsPrinting(true);
@@ -728,10 +736,9 @@ export default function Reports() {
     // ── StateHolding_Form5_Top5 ─────────────────────────────────────────────
     if (code === 'StateHolding_Form5_Top5') {
       if (!tableRows?.length) return null;
-      const { pagedRows } = getPagedRows(tableRows);
       return (
         <div className="mt-6">
-          <StateHoldingForm5Top5Report data={buildStateHoldingForm5Top5Data(pagedRows, dateFrom, dateTo)} />
+          <StateHoldingForm5Top5Report data={buildStateHoldingForm5Top5Data(tableRows, dateFrom, dateTo)} />
         </div>
       );
     }
@@ -750,10 +757,9 @@ export default function Reports() {
     // ── StateHolding_Form7 ──────────────────────────────────────────────────
     if (code === 'StateHolding_Form7') {
       if (!tableRows?.length) return null;
-      const { pagedRows } = getPagedRows(tableRows);
       return (
         <div className="mt-6">
-          <StateHoldingForm7Report data={buildStateHoldingForm7Data(pagedRows, dateFrom, dateTo)} />
+          <StateHoldingForm7Report data={buildStateHoldingForm7Data(tableRows, dateFrom, dateTo)} />
         </div>
       );
     }
@@ -1093,12 +1099,23 @@ export default function Reports() {
                     setValidationError(null);
                     const form = forms.find((f) => String(f.id) === newId);
                     const meta = form ? FORM_META[form.code] : undefined;
-                    if (meta?.filterMode !== 'quik') {
+                    if (meta?.filterMode === 'oracle') {
                       setFilters((prev) => ({
                         ...prev,
                         classCode: undefined,
                         instrument: undefined,
                         firmCode: undefined,
+                      }));
+                    } else if (meta?.filterMode === 'none') {
+                      setFilters((prev) => ({
+                        ...prev,
+                        instrument: undefined,
+                        firmCode: undefined,
+                      }));
+                    } else if (meta?.filterMode === 'firm') {
+                      setFilters((prev) => ({
+                        ...prev,
+                        instrument: undefined,
                       }));
                     }
                     if (meta?.filterMode === 'oracle') {
@@ -1149,6 +1166,32 @@ export default function Reports() {
                 </div>
               )}
 
+              {/* Класс (все QUIK-отчёты, кроме Oracle) */}
+              {showClassFilter && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
+                    Класс
+                  </label>
+                  <SelectWithSearch
+                    value={filters.classCode ?? '0'}
+                    onValueChange={(v) => {
+                      const classCode = v === '0' ? undefined : v;
+                      setFilters({ ...filters, classCode, instrument: undefined });
+                    }}
+                    disabled={!selectedFormId}
+                    placeholder="— все классы —"
+                    searchFields={['label', 'value']}
+                    options={[
+                      { value: '0', label: '— все классы —' },
+                      ...classes.map((c) => ({
+                        value: c.code,
+                        label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
+                      })),
+                    ]}
+                  />
+                </div>
+              )}
+
               {/* Только Участник */}
               {filterMode === 'firm' && (
                 <div className="space-y-1.5">
@@ -1172,32 +1215,9 @@ export default function Reports() {
                 </div>
               )}
 
-              {/* Класс + Инструмент + Участник (QUIK) */}
+              {/* Инструмент + Участник (полный QUIK) */}
               {filterMode === 'quik' && (
                 <>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
-                      Класс
-                    </label>
-                    <SelectWithSearch
-                      value={filters.classCode ?? '0'}
-                      onValueChange={(v) => {
-                        const classCode = v === '0' ? undefined : v;
-                        setFilters({ ...filters, classCode, instrument: undefined });
-                      }}
-                      disabled={!selectedFormId}
-                      placeholder="— все классы —"
-                      searchFields={['label', 'value']}
-                      options={[
-                        { value: '0', label: '— все классы —' },
-                        ...classes.map((c) => ({
-                          value: c.code,
-                          label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
-                        })),
-                      ]}
-                    />
-                  </div>
-
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#3d848c' }}>
                       Инструмент

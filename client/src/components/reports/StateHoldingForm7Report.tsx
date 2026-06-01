@@ -73,113 +73,124 @@ interface Props {
   data: StateHoldingForm7Data;
 }
 
+function Form7TableHead() {
+  return (
+    <thead>
+      <tr className="bg-muted/60">
+        <th className="border border-border px-2 py-2 text-left font-medium" rowSpan={2}>
+          Наименование ценной бумаги
+        </th>
+        <th className="border border-border px-2 py-2 text-left font-medium" rowSpan={2}>
+          Дата
+        </th>
+        <th className="border border-border px-2 py-2 text-left font-medium" rowSpan={2}>
+          Государственный регистрационный номер
+        </th>
+        <th className="border border-border px-2 py-2 text-right font-medium" rowSpan={2}>
+          Количество сделок
+        </th>
+        <th className="border border-border px-2 py-2 text-right font-medium" rowSpan={2}>
+          Количество ценных бумаг (шт.)
+        </th>
+        <th className="border border-border px-2 py-2 text-center font-medium" colSpan={3}>
+          Цена ценной бумаги (сом.)
+        </th>
+        <th className="border border-border px-2 py-2 text-right font-medium" rowSpan={2}>
+          Объем сделки (сом.)
+        </th>
+      </tr>
+      <tr className="bg-muted/60">
+        <th className="border border-border px-2 py-2 text-right font-medium">max цена</th>
+        <th className="border border-border px-2 py-2 text-right font-medium">min цена</th>
+        <th className="border border-border px-2 py-2 text-right font-medium">средняя цена</th>
+      </tr>
+    </thead>
+  );
+}
+
 export function StateHoldingForm7Report({ data }: Props) {
   return (
     <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
-        formNumber="Форма 7"
+        formNumber="Форма-7"
         title="Отчет о сделках по брокерским и дилерским фирмам"
         periodFrom={data.periodFrom}
         periodTo={data.periodTo}
       />
 
-      {data.firms.map((firm, fIdx) => (
-        <div key={fIdx} className="mb-6">
-          <div className="mb-2 text-sm font-semibold">
-            Брокерская фирма: {firm.brokerName || firm.brokerCode}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-border text-xs">
-              <thead>
-                <tr className="bg-muted/60">
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Наименование ценной бумаги
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Дата
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Государственный регистрационный номер
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Количество сделок
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Количество ценных бумаг (шт.)
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" colSpan={3}>
-                    Цена ценной бумаги (сом.)
-                  </th>
-                  <th className="border border-border px-2 py-1 text-center font-medium" rowSpan={2}>
-                    Объем сделки (сом.)
-                  </th>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border border-border text-sm">
+          <Form7TableHead />
+          <tbody>
+            {data.firms.map((firm, fIdx) => (
+              <React.Fragment key={fIdx}>
+                <tr className="bg-emerald-50/80">
+                  <td className="border border-border px-2 py-1 font-medium" colSpan={9}>
+                    Брокер (покупатель): {firm.brokerName || firm.brokerCode}
+                  </td>
                 </tr>
-                <tr className="bg-muted/60">
-                  <th className="border border-border px-2 py-1 text-center font-medium">max цена</th>
-                  <th className="border border-border px-2 py-1 text-center font-medium">min цена</th>
-                  <th className="border border-border px-2 py-1 text-center font-medium">средняя цена</th>
-                </tr>
-              </thead>
-              <tbody>
                 {firm.securities.map((sec, sIdx) => (
                   <React.Fragment key={sIdx}>
                     {sec.rows.map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-muted/20">
+                      <tr key={rIdx}>
                         <td className="border border-border px-2 py-1">{row.secFullName || row.secCode}</td>
                         <td className="border border-border px-2 py-1 whitespace-nowrap">{formatDate(row.tradeDate)}</td>
                         <td className="border border-border px-2 py-1 whitespace-nowrap">{row.isinCode || row.secCode}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(row.dealCount)}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(row.quantity)}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(row.maxPrice)}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(row.minPrice)}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(row.avgPrice)}</td>
-                        <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(row.volume)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatInt(row.dealCount)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatInt(row.quantity)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(row.maxPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(row.minPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(row.avgPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(row.volume)}</td>
                       </tr>
                     ))}
-                    <tr className="bg-muted/40 font-medium">
-                      <td className="border border-border px-2 py-1" colSpan={3}>
-                        Итого по ценным бумагам
-                      </td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(sec.totalDealCount)}</td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(sec.totalQuantity)}</td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(sec.maxPrice)}</td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(sec.minPrice)}</td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(sec.avgPrice)}</td>
-                      <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(sec.totalVolume)}</td>
-                    </tr>
+                    {sec.rows.length > 1 && (
+                      <tr className="font-semibold">
+                        <td className="border border-border px-2 py-1" colSpan={3}>
+                          Итого по ценным бумагам
+                        </td>
+                        <td className="border border-border px-2 py-1 text-right">{formatInt(sec.totalDealCount)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatInt(sec.totalQuantity)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(sec.maxPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(sec.minPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(sec.avgPrice)}</td>
+                        <td className="border border-border px-2 py-1 text-right">{formatNum(sec.totalVolume)}</td>
+                      </tr>
+                    )}
                   </React.Fragment>
                 ))}
-                <tr className="bg-muted/70 font-semibold">
+                <tr className="font-semibold">
                   <td className="border border-border px-2 py-1" colSpan={3}>
                     Итого по фирме
                   </td>
-                  <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(firm.totalDealCount)}</td>
-                  <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(firm.totalQuantity)}</td>
+                  <td className="border border-border px-2 py-1 text-right">{formatInt(firm.totalDealCount)}</td>
+                  <td className="border border-border px-2 py-1 text-right">{formatInt(firm.totalQuantity)}</td>
                   <td className="border border-border px-2 py-1" colSpan={3} />
-                  <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(firm.totalVolume)}</td>
+                  <td className="border border-border px-2 py-1 text-right">{formatNum(firm.totalVolume)}</td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-
-      {data.firms.length > 1 && (
-        <table className="w-full border-collapse border border-border text-xs mt-2">
-          <tbody>
-            <tr className="bg-muted/80 font-bold">
-              <td className="border border-border px-2 py-1" colSpan={3}>Итого</td>
-              <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(data.grandTotalDealCount)}</td>
-              <td className="border border-border px-2 py-1 text-right tabular-nums">{formatInt(data.grandTotalQuantity)}</td>
-              <td className="border border-border px-2 py-1" colSpan={3} />
-              <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(data.grandTotalVolume)}</td>
-            </tr>
+              </React.Fragment>
+            ))}
+            {data.firms.length > 1 && (
+              <tr className="font-semibold">
+                <td className="border border-border px-2 py-1" colSpan={3}>Итого</td>
+                <td className="border border-border px-2 py-1 text-right">{formatInt(data.grandTotalDealCount)}</td>
+                <td className="border border-border px-2 py-1 text-right">{formatInt(data.grandTotalQuantity)}</td>
+                <td className="border border-border px-2 py-1" colSpan={3} />
+                <td className="border border-border px-2 py-1 text-right">{formatNum(data.grandTotalVolume)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
+}
+
+function brokerKeyFromRow(r: Record<string, unknown>): string {
+  const code = String(r.brokerCode ?? '').trim();
+  if (code) return code;
+  const name = String(r.brokerName ?? '').trim();
+  return name ? `n:${name.toUpperCase()}` : '';
 }
 
 export function buildStateHoldingForm7Data(
@@ -190,12 +201,23 @@ export function buildStateHoldingForm7Data(
   const firmMap = new Map<string, FirmGroup>();
 
   for (const r of rows) {
-    const brokerCode = String(r.brokerCode ?? '');
+    const brokerKey = brokerKeyFromRow(r);
+    if (!brokerKey) continue;
+
+    const brokerCode = String(r.brokerCode ?? brokerKey);
     const brokerName = String(r.brokerName ?? brokerCode);
     const secCode = String(r.secCode ?? '');
+    const secFullName = String(r.secFullName ?? secCode);
+    const tradeDate = String(r.tradeDate ?? '').slice(0, 10);
+    const dealCount = Number(r.dealCount ?? 0);
+    const quantity = Number(r.quantity ?? 0);
+    const maxPrice = Number(r.maxPrice ?? 0);
+    const minPrice = Number(r.minPrice ?? 0);
+    const avgPrice = Number(r.avgPrice ?? 0);
+    const volume = Number(r.volume ?? 0);
 
-    if (!firmMap.has(brokerCode)) {
-      firmMap.set(brokerCode, {
+    if (!firmMap.has(brokerKey)) {
+      firmMap.set(brokerKey, {
         brokerCode,
         brokerName,
         securities: [],
@@ -204,50 +226,42 @@ export function buildStateHoldingForm7Data(
         totalVolume: 0,
       });
     }
-    const firm = firmMap.get(brokerCode)!;
+    const firm = firmMap.get(brokerKey)!;
+    if (brokerName) firm.brokerName = brokerName;
 
     let sec = firm.securities.find((s) => s.secCode === secCode);
     if (!sec) {
       sec = {
         secCode,
-        secFullName: String(r.secFullName ?? secCode),
+        secFullName,
         isinCode: String(r.isinCode ?? secCode),
         rows: [],
         totalDealCount: 0,
         totalQuantity: 0,
         totalVolume: 0,
         maxPrice: 0,
-        minPrice: Infinity,
+        minPrice: 0,
         avgPrice: 0,
       };
       firm.securities.push(sec);
+    } else if (secFullName.length > sec.secFullName.length) {
+      sec.secFullName = secFullName;
     }
 
-    const row: StateHoldingForm7Row = {
+    sec.rows.push({
       brokerCode,
       brokerName,
       secCode,
-      secFullName: String(r.secFullName ?? secCode),
+      secFullName,
       isinCode: String(r.isinCode ?? secCode),
-      tradeDate: String(r.tradeDate ?? '').slice(0, 10),
-      dealCount: Number(r.dealCount ?? 0),
-      quantity: Number(r.quantity ?? 0),
-      maxPrice: Number(r.maxPrice ?? 0),
-      minPrice: Number(r.minPrice ?? 0),
-      avgPrice: Number(r.avgPrice ?? 0),
-      volume: Number(r.volume ?? 0),
-    };
-
-    sec.rows.push(row);
-    sec.totalDealCount += row.dealCount;
-    sec.totalQuantity += row.quantity;
-    sec.totalVolume += row.volume;
-    if (row.maxPrice > sec.maxPrice) sec.maxPrice = row.maxPrice;
-    if (row.minPrice < sec.minPrice) sec.minPrice = row.minPrice;
-
-    firm.totalDealCount += row.dealCount;
-    firm.totalQuantity += row.quantity;
-    firm.totalVolume += row.volume;
+      tradeDate,
+      dealCount,
+      quantity,
+      maxPrice,
+      minPrice,
+      avgPrice,
+      volume,
+    });
   }
 
   let grandTotalDealCount = 0;
@@ -255,18 +269,31 @@ export function buildStateHoldingForm7Data(
   let grandTotalVolume = 0;
 
   for (const firm of firmMap.values()) {
+    firm.totalDealCount = 0;
+    firm.totalQuantity = 0;
+    firm.totalVolume = 0;
+
+    for (const sec of firm.securities) {
+      sec.rows.sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+      sec.totalDealCount = sec.rows.reduce((s, row) => s + row.dealCount, 0);
+      sec.totalQuantity = sec.rows.reduce((s, row) => s + row.quantity, 0);
+      sec.totalVolume = sec.rows.reduce((s, row) => s + row.volume, 0);
+      const prices = sec.rows.flatMap((row) => [row.maxPrice, row.minPrice].filter((p) => p > 0));
+      sec.maxPrice = prices.length ? Math.max(...prices) : 0;
+      sec.minPrice = prices.length ? Math.min(...prices) : 0;
+      sec.avgPrice =
+        sec.totalQuantity > 0
+          ? sec.rows.reduce((s, row) => s + row.avgPrice * row.quantity, 0) / sec.totalQuantity
+          : 0;
+
+      firm.totalDealCount += sec.totalDealCount;
+      firm.totalQuantity += sec.totalQuantity;
+      firm.totalVolume += sec.totalVolume;
+    }
+
     grandTotalDealCount += firm.totalDealCount;
     grandTotalQuantity += firm.totalQuantity;
     grandTotalVolume += firm.totalVolume;
-
-    // avgPrice для итого по ЦБ — средневзвешенная
-    for (const sec of firm.securities) {
-      if (sec.minPrice === Infinity) sec.minPrice = 0;
-      const totalQty = sec.rows.reduce((s, r) => s + r.quantity, 0);
-      sec.avgPrice = totalQty > 0
-        ? sec.rows.reduce((s, r) => s + r.avgPrice * r.quantity, 0) / totalQty
-        : 0;
-    }
   }
 
   return {

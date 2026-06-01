@@ -10,6 +10,26 @@ import { getReportDefinition, getSqlForReport } from './report-definitions.js';
 import { getReportFormById } from '../db/repositories/reportForms.js';
 import { calculateCommissionForTrade } from './commission-engine.js';
 
+/** Агрегированные отчёты: не дедуплицируем по id (иначе схлопываются строки). */
+const AGGREGATED_REPORT_CODES = new Set([
+  'Auction_Summary',
+  'Auction_Summary_2',
+  'Auction_Bid_Classification',
+  'Auction_Central_Depository',
+  'Auction_Additional_Placement',
+  'Exchange_Contract',
+  'Exchange_Certificate',
+  'Blank_Form_7',
+  'StateHolding_Form5_Top5',
+  'StateHolding_Form7',
+  'StateHolding_Form8',
+  'StateHolding_Form9',
+  'StateHolding_Form10',
+]);
+
+/** После SQL — только фильтры по классу/инструменту (без брокера). */
+const SQL_INSTRUMENT_CLASS_FILTER_CODES = AGGREGATED_REPORT_CODES;
+
 export async function runReport(params: RunReportParams): Promise<ReportResult> {
   const { reportFormId, dataSourceIds = [], filters } = params;
 
@@ -63,7 +83,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   // Дедупликация по ID сделки (на случай, если разные источники вернули одинаковые сделки)
   // Для аукционов не дедуплицируем — строки агрегированы (по цене или сравнение текущий/предыдущий)
   let uniqueTrades: Trade[];
-  if (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8' || form.code === 'StateHolding_Form10') {
+  if (AGGREGATED_REPORT_CODES.has(form.code)) {
     uniqueTrades = allTrades;
   } else {
     const uniqueTradesMap = new Map<string, Trade>();
@@ -112,11 +132,19 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
 
   // Если использовался custom SQL с параметрами, фильтрация уже применена в запросе
   // Для аукционов в строках нет brokerId — применяем только фильтр по инструменту
-  const filtered = sqlQuery
-    ? applyFilters(withCommissions, (form.code === 'Auction_Summary' || form.code === 'Auction_Summary_2' || form.code === 'Auction_Bid_Classification' || form.code === 'Auction_Central_Depository' || form.code === 'Auction_Additional_Placement' || form.code === 'Exchange_Contract' || form.code === 'Exchange_Certificate' || form.code === 'Blank_Form_7' || form.code === 'StateHolding_Form5_Top5' || form.code === 'StateHolding_Form7' || form.code === 'StateHolding_Form8' || form.code === 'StateHolding_Form10')
+  const postSqlFilters =
+    form.code === 'StateHolding_Form7'
+      ? { instrument: filters.instrument, classCode: filters.classCode, firmCode: filters.firmCode }
+      : SQL_INSTRUMENT_CLASS_FILTER_CODES.has(form.code)
         ? { instrument: filters.instrument, classCode: filters.classCode }
-        : { brokerId: filters.brokerId, firmCode: filters.firmCode, instrument: filters.instrument, classCode: filters.classCode })
-    : applyFilters(withCommissions, filters);
+        : {
+            brokerId: filters.brokerId,
+            firmCode: filters.firmCode,
+            instrument: filters.instrument,
+            classCode: filters.classCode,
+          };
+
+  const filtered = sqlQuery ? applyFilters(withCommissions, postSqlFilters) : applyFilters(withCommissions, filters);
   const normalized = normalizeTradesForReport(filtered);
 
   if (form.type === 'table') {

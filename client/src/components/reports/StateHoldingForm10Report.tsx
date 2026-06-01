@@ -1,7 +1,6 @@
 /**
  * Госхолдинг Форма 10 — Значение индекса за торговый день.
- * Колонки: Дата расчета индекса, Значение индекса (пунктов),
- * Изменения индекса по сравнению с индексом предыдущего торгового дня (в %).
+ * Колонки: Дата расчета индекса, значение, изменение к предыдущему дню.
  */
 import React from 'react';
 import { ReportHeader } from './ReportHeader';
@@ -46,7 +45,7 @@ export function StateHoldingForm10Report({ data }: Props) {
       />
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-border text-xs">
+        <table className="w-full border-collapse border border-border text-sm">
           <thead>
             <tr className="bg-muted/60">
               <th className="border border-border px-2 py-2 text-center font-medium w-8">
@@ -67,8 +66,12 @@ export function StateHoldingForm10Report({ data }: Props) {
             {data.rows.map((row, idx) => (
               <tr key={idx} className="hover:bg-muted/20">
                 <td className="border border-border px-2 py-1 text-center">{idx + 1}</td>
-                <td className="border border-border px-2 py-1 whitespace-nowrap">{formatDate(row.indexDate)}</td>
-                <td className="border border-border px-2 py-1 text-right tabular-nums">{formatNum(row.indexValue, 2)}</td>
+                <td className="border border-border px-2 py-1 whitespace-nowrap">
+                  {formatDate(row.indexDate)}
+                </td>
+                <td className="border border-border px-2 py-1 text-right tabular-nums">
+                  {formatNum(row.indexValue, 2)}
+                </td>
                 <td className="border border-border px-2 py-1 text-right tabular-nums">
                   {row.changePct != null ? formatNum(row.changePct, 2) : ''}
                 </td>
@@ -89,16 +92,20 @@ export function buildStateHoldingForm10Data(
   const sorted = [...rows].sort((a, b) =>
     String(a.tradeDate ?? '').localeCompare(String(b.tradeDate ?? '')),
   );
+
   const out: StateHoldingForm10Row[] = sorted.map((r, i) => {
     const indexValue = Number(r.indexValue ?? 0);
     const prev = i > 0 ? Number(sorted[i - 1].indexValue ?? 0) : null;
     const changePct =
       prev != null && prev !== 0 ? ((indexValue - prev) / prev) * 100 : null;
+
     return {
       indexDate: String(r.tradeDate ?? '').slice(0, 10),
       indexValue,
       changePct,
     };
   });
+
   return { periodFrom, periodTo, rows: out };
 }
+

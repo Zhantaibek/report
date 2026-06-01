@@ -57,6 +57,8 @@ export async function runCustomSqlQuery(
   const params: (string | null)[] = [
     filters?.dateFrom ?? defaultDate,
     filters?.dateTo ?? filters?.dateFrom ?? defaultDate,
+    filters?.classCode?.trim() || null,
+    filters?.instrument?.trim() || null,
   ];
 
   let rows: Record<string, unknown>[];

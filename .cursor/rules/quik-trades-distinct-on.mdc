@@ -1,0 +1,37 @@
+---
+description: QUIK Trades — дедупликация Купля/Продажа по TradeNum
+globs: server/reports/**/*.ts,server/data-sources/**/*.ts
+alwaysApply: false
+---
+
+# QUIK: DISTINCT ON для сделок
+
+В таблице `"Trades"` на одну сделку **две строки** с одним `"TradeNum"`: `Operation = 'Купля'` и `Operation = 'Продажа'`.
+
+## Обязательный паттерн
+
+1. **Ноги сделки** — `cteDedupTradeLeg` (`DISTINCT ON ("TradeNum")` внутри каждой операции).
+2. **Связка** — `buy_trades` JOIN `sell_trades` ON `"TradeNum"`.
+3. **Перед агрегацией** — снова `DISTINCT ON (b."TradeNum")` в CTE `matched_trades` (одна строка на сделку).
+4. **Справочники** (`Securities`, `Classes`) — только **после** `matched_trades`, через подзапрос или `MAX`, не `JOIN` до `GROUP BY` (иначе Qty/Value удваиваются).
+
+## Пример
+
+```sql
+WITH
+-- buy_trades / sell_trades через cteDedupTradeLeg ...
+matched_trades AS (
+  SELECT DISTINCT ON (b."TradeNum")
+    b."TradeNum", b."Qty", b."Value", ...
+  FROM buy_trades b
+  JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
+  ORDER BY b."TradeNum", b."TradeDate" DESC
+)
+SELECT ... SUM(qty) ... FROM matched_trades GROUP BY ...
+```
+
+## Запрещено
+
+- `FROM "Trades"` без фильтра по `Operation` и без `DISTINCT ON`.
+- `SUM(Qty)` по сырым строкам с дублями Купля/Продажа.
+- `JOIN "Securities"` / `JOIN "Classes"` до агрегации без дедупликации по `"TradeNum"`.

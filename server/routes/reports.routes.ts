@@ -300,12 +300,20 @@ router.get('/daily-volumes', async (req, res) => {
     const endDate = endDateObj.toISOString().slice(0, 10);
 
     const sql = `
+      WITH buy_trades AS (
+        SELECT DISTINCT ON (t."TradeNum")
+          t."TradeDate", t."Value"
+        FROM "Trades" t
+        WHERE t."Operation" = 'Купля'
+          AND t."TradeDate" BETWEEN $1 AND $2
+          AND ($3::text IS NULL OR t."ClassCode" = $3)
+          AND ($4::text IS NULL OR t."SecCode" ILIKE '%' || $4 || '%')
+        ORDER BY t."TradeNum", t."TradeDate" DESC
+      )
       SELECT
         to_char(b."TradeDate", 'YYYY-MM-DD') AS "date",
         SUM(b."Value") AS "totalValue"
-      FROM "Trades" b
-      WHERE b."Operation" = 'Купля'
-        AND b."TradeDate" BETWEEN $1 AND $2
+      FROM buy_trades b
       GROUP BY to_char(b."TradeDate", 'YYYY-MM-DD')
       ORDER BY "date"
     `.trim();
