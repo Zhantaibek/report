@@ -20,7 +20,6 @@ const AGGREGATED_REPORT_CODES = new Set([
   'Exchange_Contract',
   'Exchange_Certificate',
   'Blank_Form_7',
-  'StateHolding_Form5_Top5',
   'StateHolding_Form7',
   'StateHolding_Form8',
   'StateHolding_Form9',
@@ -95,6 +94,7 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     }
     uniqueTrades = Array.from(uniqueTradesMap.values());
   }
+
 
   // Обогащаем уникальные сделки рассчитанными комиссиями (если есть объём)
   const withCommissions: Trade[] = [];

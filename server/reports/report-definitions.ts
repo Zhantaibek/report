@@ -44,6 +44,42 @@ function cteDedupTradeLeg(
 )`;
 }
 
+/** Одна строка на FirmId (в справочнике возможны дубли). */
+function cteFirmsDedup(alias = 'firms_dedup'): string {
+  return `${alias} AS (
+  SELECT
+    f."FirmId",
+    MAX(NULLIF(TRIM(f."FirmName"), '')) AS "FirmName"
+  FROM "Firms" f
+  GROUP BY f."FirmId"
+)`;
+}
+
+/** Одна строка на ClassCode. */
+function cteClassesDedup(alias = 'classes_dedup'): string {
+  return `${alias} AS (
+  SELECT
+    c."ClassCode",
+    MAX(NULLIF(TRIM(c."ClassName"), '')) AS "ClassName"
+  FROM "Classes" c
+  GROUP BY c."ClassCode"
+)`;
+}
+
+/** Одна строка на SecCode. */
+function cteSecuritiesDedup(alias = 'securities_dedup'): string {
+  return `${alias} AS (
+  SELECT
+    s."SecCode",
+    MAX(NULLIF(TRIM(s."SecFullName"), '')) AS "SecFullName",
+    MAX(NULLIF(TRIM(s."ISINCode"), '')) AS "ISINCode",
+    MAX(s."ClassCode") AS "ClassCode",
+    MAX(s."FaceValue") AS "FaceValue"
+  FROM "Securities" s
+  GROUP BY s."SecCode"
+)`;
+}
+
 /** CTE: одна строка на TradeNum после join Купля+Продажа (без JOIN справочников). */
 function cteMatchedTrades(alias = 'matched_trades'): string {
   return `${alias} AS (
@@ -61,8 +97,8 @@ function cteMatchedTrades(alias = 'matched_trades'): string {
     b."ClassCode" AS class_code
   FROM buy_trades b
   JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
-  LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
-  LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
+  LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+  LEFT JOIN firms_dedup sf ON sf."FirmId" = s."FirmId"
   ORDER BY b."TradeNum", b."TradeDate" DESC
 )`;
 }
@@ -80,8 +116,11 @@ const TRADES_DATE_BETWEEN_COALESCE_DATE = 't."TradeDate" BETWEEN $1::date AND CO
 export const baseTradesQuery = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN)},
-${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN)}
-SELECT
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN)},
+${cteFirmsDedup()},
+${cteClassesDedup()},
+${cteSecuritiesDedup()}
+SELECT DISTINCT ON (b."TradeNum")
   b."TradeNum" AS "id",
   b."FirmId"   AS "buyerId",
   COALESCE(NULLIF(TRIM(bf."FirmName"), ''), b."FirmName") AS "buyerName",
@@ -103,11 +142,11 @@ SELECT
   b."Value" AS "value"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
-LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
-LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
-LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
-LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-ORDER BY b."ClassCode", b."SecCode", b."TradeDate", b."TradeNum"
+LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+LEFT JOIN firms_dedup sf ON sf."FirmId" = s."FirmId"
+LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
+ORDER BY b."TradeNum", b."TradeDate" DESC
 `.trim();
 
 /**
@@ -555,10 +594,12 @@ ORDER BY b."TradeDate", sec."SecFullName", b."SecCode", b."TradeNum"
  * Индекс = капитализация корзины / капитализация в первый торговый день × 100.
  */
 const stateHoldingForm10Query = `
-WITH index_universe AS (
-  SELECT sec."SecCode"
+WITH
+${cteClassesDedup()},
+index_universe AS (
+  SELECT DISTINCT sec."SecCode"
   FROM "Securities" sec
-  LEFT JOIN "Classes" cl ON cl."ClassCode" = sec."ClassCode"
+  LEFT JOIN classes_dedup cl ON cl."ClassCode" = sec."ClassCode"
   WHERE sec."ClassCode" = 'LISTEDSTOCKK'
      OR (
        LOWER(COALESCE(cl."ClassName", sec."ClassCode", '')) LIKE '%листинг%'
@@ -614,29 +655,26 @@ ORDER BY dc.d
 
 /**
  * Госхолдинг, Форма 5 — топ-5 участников по сумме сделок (сом) за период, разбивка по дням.
- * Как baseTradesQuery (Купля + Продажа по TradeNum); участник — покупатель (нога «Купля»).
+ * Источник: только операции «Купля» (одна строка на TradeNum).
  * Размещение / обращение — по ключевым словам в названии класса инструмента.
  */
 const stateHoldingForm5Top5Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
-${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+${cteFirmsDedup()},
+${cteClassesDedup()},
 base AS (
   SELECT
     b."TradeNum",
     b."TradeDate"::date AS d,
     b."FirmId" AS buyer_firm_id,
     COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS buyer_name,
-    s."FirmId" AS seller_firm_id,
-    COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS seller_name,
     b."Qty" AS qty,
     b."Value" AS value,
     LOWER(COALESCE(cl."ClassName", b."ClassCode", '')) AS class_l
   FROM buy_trades b
-  JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
-  LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
-  LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
-  LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
+  LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+  LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
 ),
 classified AS (
   SELECT
@@ -658,9 +696,18 @@ classified AS (
   FROM base
 ),
 legs AS (
-  SELECT d, buyer_firm_id AS firm_id, buyer_name AS firm_name, "TradeNum", qty, value, placement_part, circulation_part
+  SELECT DISTINCT ON ("TradeNum")
+    d,
+    buyer_firm_id AS firm_id,
+    buyer_name AS firm_name,
+    "TradeNum",
+    qty,
+    value,
+    placement_part,
+    circulation_part
   FROM classified
   WHERE buyer_name IS NOT NULL AND TRIM(buyer_name) <> ''
+  ORDER BY "TradeNum", d DESC
 ),
 by_participant_day AS (
   SELECT
@@ -720,7 +767,8 @@ ORDER BY rp."seqNo" ASC, bd.d ASC
 const stateHoldingForm9Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
-${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)}
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)},
+${cteSecuritiesDedup()}
 SELECT
   b."SecCode"                                     AS "secCode",
   COALESCE(sec."SecFullName", b."SecCode")        AS "secFullName",
@@ -730,8 +778,8 @@ SELECT
   ROUND(AVG(s."Price"), 2)                        AS "sellPrice"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
-LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-GROUP BY b."SecCode", sec."SecFullName", b."TradeDate"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
+GROUP BY b."SecCode", COALESCE(sec."SecFullName", b."SecCode"), b."TradeDate"
 ORDER BY b."TradeDate", b."SecCode"
 `.trim();
 
@@ -743,6 +791,8 @@ ORDER BY b."TradeDate", b."SecCode"
 const stateHoldingForm8Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteClassesDedup()},
+${cteSecuritiesDedup()},
 latest_prices AS (
   SELECT
     t."SecCode",
@@ -764,11 +814,11 @@ SELECT
     THEN 'Листинг'
     ELSE 'Нелистинг'
   END AS "listingType"
-FROM "Securities" sec
-LEFT JOIN "Classes" cl ON cl."ClassCode" = sec."ClassCode"
+FROM securities_dedup sec
+LEFT JOIN classes_dedup cl ON cl."ClassCode" = sec."ClassCode"
 LEFT JOIN latest_prices lp ON lp."SecCode" = sec."SecCode"
-WHERE ${SEC_CLASS_FILTER}
-  AND ${SEC_INSTRUMENT_FILTER}
+WHERE ($3::text IS NULL OR sec."ClassCode" = $3)
+  AND ($4::text IS NULL OR sec."SecCode" ILIKE '%' || $4 || '%')
 ORDER BY sec."ClassCode", sec."SecFullName"
 `.trim();
 
@@ -779,21 +829,26 @@ ORDER BY sec."ClassCode", sec."SecFullName"
 const stateHoldingForm7Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
-${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE_DATE)},
-${cteMatchedTrades('matched')},
+${cteFirmsDedup()},
 legs AS (
-  SELECT
-    d,
-    buyer_firm_id,
-    buyer_name,
-    COALESCE(NULLIF(TRIM(buyer_firm_id::text), ''), 'n:' || UPPER(TRIM(buyer_name))) AS part_key,
-    sec_code,
-    "TradeNum",
-    qty,
-    price,
-    value
-  FROM matched
-  WHERE buyer_name IS NOT NULL AND TRIM(buyer_name) <> ''
+  SELECT DISTINCT ON (b."TradeNum")
+    b."TradeDate"::date AS d,
+    b."FirmId" AS buyer_firm_id,
+    COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS buyer_name,
+    COALESCE(
+      NULLIF(TRIM(b."FirmId"::text), ''),
+      'n:' || UPPER(TRIM(COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), ''))))
+    ) AS part_key,
+    b."SecCode" AS sec_code,
+    b."TradeNum",
+    b."Qty" AS qty,
+    b."Price" AS price,
+    b."Value" AS value
+  FROM buy_trades b
+  LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+  WHERE COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) IS NOT NULL
+    AND TRIM(COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), ''))) <> ''
+  ORDER BY b."TradeNum", b."TradeDate" DESC
 )
 SELECT
   (l.part_key || '-' || l.sec_code || '-' || to_char(l.d, 'YYYYMMDD')) AS id,
