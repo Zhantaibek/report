@@ -7,6 +7,7 @@ import {
   type QuikReferenceTable,
 } from '../config/quik-db.js';
 import { withPostgresClient } from '../data-sources/postgres-mutate.js';
+import { canMutateQuikExport, getAppEnv } from '../config/app-env.js';
 
 export interface SyncReferenceResult {
   ok: boolean;
@@ -100,9 +101,13 @@ async function syncOneTable(client: pg.Client, table: QuikReferenceTable): Promi
     `SELECT ${columns.join(', ')} FROM ${table} ORDER BY id ASC`,
   );
 
-  await client.query(`TRUNCATE ${table} RESTART IDENTITY`);
+  // Не затираем QUIK, если в APP_DB пусто (например emitents ещё не импортированы)
+  if (rows.length === 0) {
+    console.warn(`[sync-quik] Skip ${table}: APP_DB is empty, QUIK left unchanged`);
+    return 0;
+  }
 
-  if (rows.length === 0) return 0;
+  await client.query(`TRUNCATE ${table} RESTART IDENTITY`);
 
   const batchSize = 200;
   for (let offset = 0; offset < rows.length; offset += batchSize) {
@@ -128,9 +133,17 @@ async function syncOneTable(client: pg.Client, table: QuikReferenceTable): Promi
   return rows.length;
 }
 
+const DEV_SYNC_SKIP_MSG =
+  'Синхронизация в QUIK Export отключена в development (APP_ENV=development)';
+
 export async function syncReferenceTablesToQuik(
   tables: QuikReferenceTable[] = [...QUIK_REFERENCE_TABLES],
 ): Promise<SyncReferenceResult> {
+  if (!canMutateQuikExport()) {
+    console.log(`[sync-quik] Skipped (APP_ENV=${getAppEnv()})`);
+    return { ok: false, tables: {}, error: DEV_SYNC_SKIP_MSG };
+  }
+
   const config = getQuikConnectionConfig();
   if (!config) {
     return { ok: false, tables: {}, error: 'QUIK Export не настроен (POSTGRES_QUIK_*)' };
@@ -171,7 +184,7 @@ export async function syncAllReferenceToQuik(): Promise<SyncReferenceResult> {
 
 /** Фоновая синхронизация после изменений в APP_DB (не блокирует ответ API). */
 export function scheduleReferenceSyncToQuik(tables?: QuikReferenceTable[]): void {
-  if (!isQuikConfigured()) return;
+  if (!canMutateQuikExport() || !isQuikConfigured()) return;
   void syncReferenceTablesToQuik(tables ?? [...QUIK_REFERENCE_TABLES]).catch((err) => {
     console.error('[sync-quik] Background sync failed:', err);
   });

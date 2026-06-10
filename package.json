@@ -14,7 +14,8 @@
     "db:migrate": "tsx server/db/migrate.ts",
     "db:migrate:node": "node server/dist/db/migrate.js",
     "db:seed": "tsx server/db/seed.ts",
-    "db:import-emitents": "tsx server/db/import-emitents.ts"
+    "db:import-emitents": "tsx server/db/import-emitents.ts",
+    "db:import-emitents:node": "node server/dist/db/import-emitents.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

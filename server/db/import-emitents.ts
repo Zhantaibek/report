@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { config } from '../config/index.js';
+import { isProductionApp } from '../config/app-env.js';
 import { getQuikConnectionConfig } from '../config/quik-db.js';
 import { queryPostgres } from '../data-sources/postgres.js';
 import { initDb, getDb, closeDb, setDb } from './index.js';
@@ -28,6 +29,11 @@ const COLUMNS = [
 const BATCH_SIZE = 200;
 
 async function main(): Promise<void> {
+  if (!isProductionApp()) {
+    console.error('[import-emitents] Запускайте только на сервере (APP_ENV=production)');
+    process.exit(1);
+  }
+
   const quikConfig = getQuikConnectionConfig();
   if (!quikConfig) {
     throw new Error('QUIK Export не настроен (POSTGRES_QUIK_*)');
