@@ -6,6 +6,7 @@
  */
 import { upsertCurrencyRate } from '../db/repositories/currencyRates.js';
 import { config } from '../config/index.js';
+import { scheduleReferenceSyncToQuik } from '../db/sync-reference-to-quik.js';
 
 /**
  * Делаем запрос к НБКР и сохраняем курс USD в БД.
@@ -37,6 +38,9 @@ export async function fetchAndSaveRates(): Promise<RefreshResult> {
     }
 
     await parseAndSaveNbkrXml(text, result);
+    if (result.updated.length > 0) {
+      scheduleReferenceSyncToQuik(['currency_rates']);
+    }
     if (result.updated.length === 0 && result.skipped.length === 0) {
       console.warn('[currency-job] No rates found in NBKR response');
     } else {

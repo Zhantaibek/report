@@ -25,17 +25,9 @@ function formatInt(n: number | null | undefined): string {
   return Math.round(n).toLocaleString('ru-RU');
 }
 
-/** Определяет, является ли сделка первичным рынком по названию класса. */
-function isPrimaryMarket(className: string): boolean {
-  const cl = (className ?? '').toLowerCase();
-  return (
-    cl.includes('аукцион') ||
-    cl.includes('размещ') ||
-    cl.includes('первичн') ||
-    cl.includes('эмисс') ||
-    cl.includes('выпуск') ||
-    cl.includes('допразмещ')
-  );
+/** Первичный рынок — только по справочнику «Классификация рынка» (marketType). */
+function isPrimaryMarket(row: { marketType?: string }): boolean {
+  return row.marketType === 'primary';
 }
 
 export interface StateHoldingForm6Row {
@@ -47,6 +39,7 @@ export interface StateHoldingForm6Row {
   buyerName: string;
   sellerName: string;
   className: string;
+  marketType?: string;
   quantity: number;
   price: number;
   value: number;
@@ -69,7 +62,7 @@ export function StateHoldingForm6Report({ data }: Props) {
   let totalVolSecondary = 0;
 
   for (const row of data.rows) {
-    if (isPrimaryMarket(row.className)) {
+    if (isPrimaryMarket(row)) {
       totalQtyPrimary += row.quantity;
       totalVolPrimary += row.value;
     } else {
@@ -131,7 +124,7 @@ export function StateHoldingForm6Report({ data }: Props) {
           </thead>
           <tbody>
             {data.rows.map((row, idx) => {
-              const primary = isPrimaryMarket(row.className);
+              const primary = isPrimaryMarket(row);
               return (
                 <tr key={idx} className="hover:bg-muted/20">
                   <td className="border border-border px-2 py-1 text-center tabular-nums">{row.id}</td>
@@ -192,6 +185,7 @@ export function buildStateHoldingForm6Data(
     buyerName: String(r.buyerName ?? ''),
     sellerName: String(r.sellerName ?? ''),
     className: String(r.className ?? ''),
+    marketType: r.marketType != null ? String(r.marketType) : undefined,
     quantity: Number(r.quantity ?? 0),
     price: Number(r.price ?? 0),
     value: Number(r.value ?? 0),

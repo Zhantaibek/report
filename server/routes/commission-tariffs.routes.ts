@@ -7,6 +7,7 @@ import {
   deleteCommissionTariff,
 } from '../db/repositories/commissionTariffs.js';
 import { clearCommissionTariffsCache } from '../reports/commission-tariffs.js';
+import { scheduleReferenceSyncToQuik } from '../db/sync-reference-to-quik.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -46,6 +47,7 @@ router.post('/', async (req, res) => {
     is_active: is_active !== false,
   });
   clearCommissionTariffsCache();
+  scheduleReferenceSyncToQuik(['commission_tariffs']);
   res.status(201).json(row);
 });
 
@@ -77,6 +79,7 @@ router.put('/:id', async (req, res) => {
     return;
   }
   clearCommissionTariffsCache();
+  scheduleReferenceSyncToQuik(['commission_tariffs']);
   res.json(row);
 });
 
@@ -88,6 +91,7 @@ router.delete('/:id', async (req, res) => {
   }
   await deleteCommissionTariff(id);
   clearCommissionTariffsCache();
+  scheduleReferenceSyncToQuik(['commission_tariffs']);
   res.status(204).send();
 });
 

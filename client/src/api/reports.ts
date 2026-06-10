@@ -58,7 +58,7 @@ export function getSecurities(): Promise<SecurityItem[]> {
 }
 
 export function getClasses(): Promise<ClassItem[]> {
-  return api.get('/reports/classes');
+  return api.get<ClassItem[]>('/reports/classes');
 }
 
 export function getFirms(): Promise<FirmItem[]> {

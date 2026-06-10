@@ -8,6 +8,7 @@ import {
 } from '../db/repositories/currencyRates.js';
 import { fetchAndSaveRates } from '../jobs/currency-rates.js';
 import { authMiddleware } from '../auth/middleware.js';
+import { scheduleReferenceSyncToQuik } from '../db/sync-reference-to-quik.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -35,6 +36,7 @@ router.get('/', async (_req, res) => {
 /** Обновление курса (автообновление из внешнего источника) */
 router.post('/refresh', async (_req, res) => {
   const result = await fetchAndSaveRates();
+  scheduleReferenceSyncToQuik(['currency_rates']);
   const rates = await getLatestCurrencyRates();
   const status = result.updated.length > 0 ? 'updated' : 'skipped';
   res.json({ ok: true, status, rates: rates.map(mapRow) });
@@ -52,6 +54,7 @@ router.post('/', async (req, res) => {
     return;
   }
   await upsertCurrencyRate(currency_code.toUpperCase(), Number(rate), rate_date);
+  scheduleReferenceSyncToQuik(['currency_rates']);
   res.json({ ok: true });
 });
 
@@ -68,6 +71,7 @@ router.put('/:id', async (req, res) => {
     return;
   }
   await updateCurrencyRateById(id, currency_code.toUpperCase(), Number(rate), rate_date);
+  scheduleReferenceSyncToQuik(['currency_rates']);
   res.json({ ok: true });
 });
 
@@ -79,6 +83,7 @@ router.delete('/:id', async (req, res) => {
     return;
   }
   await deleteCurrencyRate(id);
+  scheduleReferenceSyncToQuik(['currency_rates']);
   res.json({ ok: true });
 });
 

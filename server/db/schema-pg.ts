@@ -1,5 +1,7 @@
 /**
- * PostgreSQL schema for app DB. External trading DBs are never modified.
+ * PostgreSQL schema for app DB.
+ * QUIK Export: только SELECT по торговым таблицам; справочники (trade_class_rules,
+ * commission_tariffs, currency_rates, emitents) синхронизируются как зеркала — см. sync-reference-to-quik.ts.
  */
 export const schema = `
 -- Users
@@ -130,6 +132,29 @@ DO $$ BEGIN
   DROP TABLE IF EXISTS commission_tariff_classes;
 EXCEPTION WHEN others THEN NULL;
 END $$;
+
+-- Эмитенты (справочник; первичный импорт из QUIK Export: npm run db:import-emitents)
+CREATE TABLE IF NOT EXISTS emitents (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(255),
+  address VARCHAR(500),
+  city INTEGER,
+  area INTEGER,
+  state INTEGER,
+  code CHAR(4),
+  infusion NUMERIC(18,2),
+  price NUMERIC(18,6),
+  ind INTEGER,
+  name_eng VARCHAR(255)
+);
+
+-- Классы торгов: соответствие ClassCode → тип рынка (первичный / вторичный)
+CREATE TABLE IF NOT EXISTS trade_class_rules (
+  id SERIAL PRIMARY KEY,
+  class_code TEXT NOT NULL UNIQUE,
+  class_name TEXT,
+  market_type TEXT NOT NULL CHECK (market_type IN ('primary', 'secondary'))
+);
 
 -- Миграция: удаляем таблицы data_sources, field_mappings, brokers (перенесены в код / .env)
 DO $$ BEGIN

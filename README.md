@@ -78,4 +78,8 @@ npm run db:seed
 - `server/` — Express, наша БД (PostgreSQL), слой доступа к внешним БД (только SELECT), движок отчётов, авторизация, задачи (курсы валют).
 - `client/` — SPA (React, Vite): логин, дашборд, отчёты, экспорт, админ-разделы.
 
-К внешним БД торговой системы выполняются **только SELECT**; изменение данных и схемы запрещено.
+К торговым таблицам QUIK Export (`Trades`, `Securities` и т.д.) выполняются **только SELECT**.
+
+Справочники `trade_class_rules`, `commission_tariffs`, `currency_rates`, `emitents` хранятся в APP_DB (источник правды) и **синхронизируются** в QUIK Export как зеркала — после изменений в админке, при обновлении курсов и при старте сервера. Ручная синхронизация: `POST /api/admin/sync-reference-to-quik` (admin). DDL для QUIK: `docs/quik-export-reference-tables.sql`.
+
+Первичный импорт эмитентов из QUIK в APP_DB (один раз): `npm run db:migrate && npm run db:import-emitents`.

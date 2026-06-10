@@ -19,6 +19,7 @@ export interface ConnectionConfig {
   user: string;
   password: string;
   database: string;
+  connectionTimeoutMillis?: number;
 }
 
 export interface FieldMappingRow {

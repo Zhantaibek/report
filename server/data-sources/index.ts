@@ -1,7 +1,7 @@
 import type { Trade } from '../types/index.js';
 import { getDataSourceById, getFieldMappingByDataSourceId } from '../config/data-sources.js';
 import { buildSelectQuery } from './build-select.js';
-import { queryPostgres } from './postgres.js';
+import { queryPostgres, QuikConnectionError } from './postgres.js';
 import { queryMssql } from './mssql.js';
 import { queryMysql } from './mysql.js';
 import type { DataSourceType } from '../config/data-sources.js';
@@ -217,11 +217,16 @@ export async function getClasses(dataSourceId: number): Promise<ClassItem[]> {
   const ds = await getDataSourceById(dataSourceId);
   if (!ds || !ds.is_active) return [];
 
-  // Пробуем таблицу Classes с типичными вариантами колонок QUIK
+  const mapRows = (rows: Record<string, unknown>[]) =>
+    rows
+      .map((r) => ({
+        code: String(getField(r, 'code') ?? getField(r, 'ClassCode', 'classcode', 'CLASSCODE') ?? ''),
+        name: String(getField(r, 'name') ?? getField(r, 'code') ?? getField(r, 'ClassCode', 'classcode', 'CLASSCODE') ?? ''),
+      }))
+      .filter((c) => c.code);
+
   const classesQueries = [
-    // QUIK: ClassCode + ClassName
     `SELECT "ClassCode" AS code, COALESCE("ClassName", "ClassCode") AS name FROM "Classes" ORDER BY "ClassCode"`,
-    // Альтернативные имена
     `SELECT "Code" AS code, COALESCE("Name", "Code") AS name FROM "Classes" ORDER BY "Code"`,
     `SELECT "code" AS code, COALESCE("name", "code") AS name FROM "Classes" ORDER BY "code"`,
   ];
@@ -229,45 +234,40 @@ export async function getClasses(dataSourceId: number): Promise<ClassItem[]> {
   for (const sql of classesQueries) {
     try {
       const rows = await queryDs(ds, sql);
-      if (rows.length > 0) {
-        return rows
-          .map((r) => ({
-            code: String(getField(r, 'code') ?? ''),
-            name: String(getField(r, 'name') ?? getField(r, 'code') ?? ''),
-          }))
-          .filter((c) => c.code);
+      if (rows.length > 0) return mapRows(rows);
+    } catch (e) {
+      if (e instanceof QuikConnectionError) {
+        console.error('[getClasses] connection error');
+        return [];
       }
-    } catch {
-      // этот вариант не подошёл — пробуем следующий
     }
   }
 
-  // Фолбек: distinct ClassCode из Securities
   try {
-    const rows = await queryDs(ds, `SELECT DISTINCT "ClassCode" FROM "Securities" WHERE "ClassCode" IS NOT NULL ORDER BY "ClassCode"`);
-    if (rows.length > 0) {
-      return rows
-        .map((r) => {
-          const code = String(getField(r, 'ClassCode', 'classcode', 'CLASSCODE') ?? '');
-          return { code, name: code };
-        })
-        .filter((c) => c.code);
-    }
-  } catch {
-    // Securities недоступна — последний фолбек по Trades
-  }
-
-  // Последний фолбек: distinct ClassCode из Trades
-  try {
-    const rows = await queryDs(ds, `SELECT DISTINCT "ClassCode" FROM "Trades" WHERE "ClassCode" IS NOT NULL ORDER BY "ClassCode"`);
-    return rows
-      .map((r) => {
-        const code = String(getField(r, 'ClassCode', 'classcode', 'CLASSCODE') ?? '');
-        return { code, name: code };
-      })
-      .filter((c) => c.code);
+    const rows = await queryDs(
+      ds,
+      `SELECT DISTINCT "ClassCode" AS code, "ClassCode" AS name FROM "Securities" WHERE "ClassCode" IS NOT NULL ORDER BY "ClassCode"`,
+    );
+    if (rows.length > 0) return mapRows(rows);
   } catch (e) {
-    console.error('[getClasses] error:', e);
+    if (e instanceof QuikConnectionError) {
+      console.error('[getClasses] connection error');
+      return [];
+    }
+  }
+
+  try {
+    const rows = await queryDs(
+      ds,
+      `SELECT DISTINCT "ClassCode" AS code, "ClassCode" AS name FROM "Trades" WHERE "ClassCode" IS NOT NULL ORDER BY "ClassCode"`,
+    );
+    return mapRows(rows);
+  } catch (e) {
+    if (e instanceof QuikConnectionError) {
+      console.error('[getClasses] connection error');
+    } else {
+      console.error('[getClasses] error:', e);
+    }
     return [];
   }
 }

@@ -9,6 +9,7 @@ import type { RunReportParams } from '../types/index.js';
 import { getReportDefinition, getSqlForReport } from './report-definitions.js';
 import { getReportFormById } from '../db/repositories/reportForms.js';
 import { calculateCommissionForTrade } from './commission-engine.js';
+import { loadTradeClassRulesMap, resolveMarketTypeSync, buildMarketRulesSqlCte } from './market-type.js';
 
 /** Агрегированные отчёты: не дедуплицируем по id (иначе схлопываются строки). */
 const AGGREGATED_REPORT_CODES = new Set([
@@ -59,7 +60,11 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   const sources = getDataSources(true);
   const sourceIds = dataSourceIds.length > 0 ? dataSourceIds : sources.map((ds) => ds.id);
 
-  const sqlQuery = getSqlForReport(definition.code);
+  let sqlQuery = getSqlForReport(definition.code);
+  if (sqlQuery?.includes('__MARKET_RULES_CTE__')) {
+    const marketRules = await loadTradeClassRulesMap();
+    sqlQuery = sqlQuery.replace('__MARKET_RULES_CTE__', buildMarketRulesSqlCte(marketRules));
+  }
   if (sqlQuery && sourceIds.length === 0) {
     throw new Error('Нет активных источников данных. Настройте переменные POSTGRES_QUIK_HOST, POSTGRES_QUIK_DATABASE, POSTGRES_QUIK_USER, POSTGRES_QUIK_PASSWORD в .env');
   }
@@ -96,15 +101,18 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
   }
 
 
-  // Обогащаем уникальные сделки рассчитанными комиссиями (если есть объём)
+  // Обогащаем сделки типом рынка и комиссиями
+  const marketRules = await loadTradeClassRulesMap();
   const withCommissions: Trade[] = [];
   for (const trade of uniqueTrades) {
+    const classCode = (trade as any).classCode as string | undefined;
+    const marketType = resolveMarketTypeSync(marketRules, classCode);
+
     const value = Number((trade as any).value ?? 0);
     if (!Number.isFinite(value) || value <= 0) {
-      withCommissions.push(trade);
+      withCommissions.push({ ...trade, marketType } as Trade);
       continue;
     }
-    const classCode = (trade as any).classCode as string | undefined;
     const tradeDateRaw =
       (trade as any).tradeDate ??
       (trade as any).dealDate ??
@@ -120,10 +128,11 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     });
 
     if (sellerCommission == null && buyerCommission == null) {
-      withCommissions.push(trade);
+      withCommissions.push({ ...trade, marketType } as Trade);
     } else {
       withCommissions.push({
         ...trade,
+        marketType,
         sellerCommission,
         buyerCommission,
       } as Trade);

@@ -1,10 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Percent, Coins, Landmark } from 'lucide-react';
+import { Percent, Coins, Layers } from 'lucide-react';
 
 const TABS = [
   { to: '/admin/reference/tariffs', label: 'Тарифы', icon: Percent },
   { to: '/admin/reference/currency-rates', label: 'Курсы валют', icon: Coins },
-  { to: '/admin/reference/securities', label: 'Ценные бумаги', icon: Landmark },
+  { to: '/admin/reference/trade-classes', label: 'Классификация рынка', icon: Layers },
 ] as const;
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>

@@ -655,14 +655,13 @@ ORDER BY dc.d
 
 /**
  * Госхолдинг, Форма 5 — топ-5 участников по сумме сделок (сом) за период, разбивка по дням.
- * Источник: только операции «Купля» (одна строка на TradeNum).
- * Размещение / обращение — по ключевым словам в названии класса инструмента.
+ * Размещение / обращение — по справочнику «Классификация рынка».
  */
 const stateHoldingForm5Top5Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
 ${cteFirmsDedup()},
-${cteClassesDedup()},
+__MARKET_RULES_CTE__,
 base AS (
   SELECT
     b."TradeNum",
@@ -671,29 +670,17 @@ base AS (
     COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS buyer_name,
     b."Qty" AS qty,
     b."Value" AS value,
-    LOWER(COALESCE(cl."ClassName", b."ClassCode", '')) AS class_l
+    b."ClassCode" AS class_code
   FROM buy_trades b
   LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
-  LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
 ),
 classified AS (
   SELECT
-    *,
-    CASE
-      WHEN class_l LIKE '%аукцион%' OR class_l LIKE '%размещ%'
-        OR class_l LIKE '%первичн%' OR class_l LIKE '%эмисс%'
-        OR class_l LIKE '%выпуск%' OR class_l LIKE '%допразмещ%'
-      THEN value
-      ELSE 0::numeric
-    END AS placement_part,
-    CASE
-      WHEN class_l LIKE '%аукцион%' OR class_l LIKE '%размещ%'
-        OR class_l LIKE '%первичн%' OR class_l LIKE '%эмисс%'
-        OR class_l LIKE '%выпуск%' OR class_l LIKE '%допразмещ%'
-      THEN 0::numeric
-      ELSE value
-    END AS circulation_part
-  FROM base
+    b.*,
+    CASE WHEN mr.market_type = 'primary' THEN b.value ELSE 0::numeric END AS placement_part,
+    CASE WHEN mr.market_type = 'primary' THEN 0::numeric ELSE b.value END AS circulation_part
+  FROM base b
+  LEFT JOIN market_rules mr ON LOWER(mr.class_code) = LOWER(b.class_code)
 ),
 legs AS (
   SELECT DISTINCT ON ("TradeNum")

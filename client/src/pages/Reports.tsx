@@ -1127,6 +1127,7 @@ export default function Reports() {
                     }
                   }}
                   placeholder="— выбрать —"
+                  dropdownWidth="wide"
                   searchFields={['label']}
                   groups={reportFormSelectGroups.map(([category, categoryForms]): SelectOptionGroup => ({
                     label: category,

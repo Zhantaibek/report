@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Search } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
@@ -159,6 +160,11 @@ interface SelectWithSearchProps {
   groups?: SelectOptionGroup[];
   searchFields?: string[];
   triggerClassName?: string;
+  /** Минимальная высота прокручиваемой области списка */
+  listMinHeight?: string;
+  emptyMessage?: string;
+  /** Ширина списка: по полю (по умолчанию) или до 42rem */
+  dropdownWidth?: 'trigger' | 'wide';
 }
 
 function SelectWithSearch({
@@ -176,9 +182,13 @@ function SelectWithSearch({
   groups,
   searchFields = ['label'],
   triggerClassName,
+  listMinHeight,
+  emptyMessage = 'Ничего не найдено',
+  dropdownWidth = 'trigger',
 }: SelectWithSearchProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   /** true = группа свёрнута */
   const [groupCollapsed, setGroupCollapsed] = React.useState<Record<string, boolean>>({});
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -189,21 +199,74 @@ function SelectWithSearch({
   React.useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch('');
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || listRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
+      setSearch('');
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Фокус на input при открытии
-  React.useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }
-  }, [open]);
+  // Фокус на input при открытии + позиция dropdown (portal, не обрезается модалкой)
+  React.useLayoutEffect(() => {
+    if (!open || !containerRef.current) return;
+
+    const updatePosition = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const maxH = 448;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+      const available = openUp ? spaceAbove : spaceBelow;
+      const height = Math.min(maxH, Math.max(available, 200));
+
+      const viewportPad = 8;
+      const contentMax = 672; // 42rem
+      let left = rect.left;
+      const triggerWidth = Math.max(rect.width, 280);
+
+      let panelWidth: number;
+      if (dropdownWidth === 'wide') {
+        const maxWide = Math.min(contentMax, window.innerWidth - left - viewportPad);
+        panelWidth = Math.max(triggerWidth, maxWide);
+        if (panelWidth > maxWide) {
+          left = Math.max(viewportPad, window.innerWidth - viewportPad - panelWidth);
+          panelWidth = Math.min(contentMax, window.innerWidth - left - viewportPad);
+        }
+      } else {
+        panelWidth = Math.min(triggerWidth, window.innerWidth - viewportPad * 2);
+        if (left + panelWidth > window.innerWidth - viewportPad) {
+          left = Math.max(viewportPad, window.innerWidth - viewportPad - panelWidth);
+        }
+      }
+
+      setDropdownStyle({
+        position: 'fixed',
+        left,
+        width: panelWidth,
+        minWidth: panelWidth,
+        maxWidth: panelWidth,
+        zIndex: 200,
+        maxHeight: height,
+        ...(openUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    const t = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, dropdownWidth]);
 
   const allOptions: SelectOption[] = React.useMemo(() => {
     if (options) return options;
@@ -267,18 +330,18 @@ function SelectWithSearch({
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative min-w-0">
       {/* Trigger */}
       <button
         type="button"
         disabled={disabled || loading}
         onClick={() => !(disabled || loading) && setOpen((v) => !v)}
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full min-w-0 items-center justify-between overflow-hidden rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
           triggerClassName
         )}
       >
-        <span className={cn('flex-1 text-left truncate', !selectedLabel && 'text-muted-foreground')}>
+        <span className={cn('min-w-0 flex-1 truncate text-left', !selectedLabel && 'text-muted-foreground')}>
           {selectedLabel ?? placeholder ?? ''}
         </span>
         {loading
@@ -287,18 +350,16 @@ function SelectWithSearch({
         }
       </button>
 
-      {/* Dropdown */}
-      {open && (
+      {/* Dropdown (portal — не обрезается overflow модалки) */}
+      {open && createPortal(
         <div
           ref={listRef}
-          className="absolute left-0 z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md"
+          className="overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
           style={{
-            maxHeight: '18rem',
+            ...dropdownStyle,
             display: 'flex',
             flexDirection: 'column',
-            minWidth: '100%',
-            width: 'max-content',
-            maxWidth: 'min(42rem, calc(100vw - 2rem))',
+            boxSizing: 'border-box',
           }}
         >
           {/* Search input */}
@@ -319,9 +380,12 @@ function SelectWithSearch({
           )}
 
           {/* List */}
-          <div className="overflow-y-auto py-1.5 pl-1.5 pr-4 [scrollbar-gutter:stable]">
+          <div
+            className="flex-1 overflow-x-hidden overflow-y-auto py-1.5 pl-1.5 pr-4 [scrollbar-gutter:stable]"
+            style={listMinHeight ? { minHeight: listMinHeight } : undefined}
+          >
             {!hasResults && (
-              <div className="py-4 text-center text-sm text-muted-foreground">Ничего не найдено</div>
+              <div className="py-4 text-center text-sm text-muted-foreground">{emptyMessage}</div>
             )}
 
             {/* Плоский список */}
@@ -333,14 +397,14 @@ function SelectWithSearch({
                   title={opt.label}
                   onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                   className={cn(
-                    'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
+                    'relative flex cursor-default select-none items-start rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
                     selected && 'bg-muted'
                   )}
                 >
-                  <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+                  <span className="absolute left-3 top-2.5 flex h-4 w-4 items-center justify-center">
                     {selected && <Check className="h-4 w-4" />}
                   </span>
-                  <span className="block min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
+                  <span className="block min-w-0 flex-1 whitespace-normal break-words leading-snug">{opt.label}</span>
                 </div>
               );
             })}
@@ -381,14 +445,14 @@ function SelectWithSearch({
                             handleSelect(opt.value);
                           }}
                           className={cn(
-                            'relative flex cursor-default select-none items-center rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
+                            'relative flex cursor-default select-none items-start rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
                             selected && 'bg-muted',
                           )}
                         >
-                          <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+                          <span className="absolute left-3 top-2.5 flex h-4 w-4 items-center justify-center">
                             {selected && <Check className="h-4 w-4" />}
                           </span>
-                          <span className="block min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
+                          <span className="block min-w-0 flex-1 whitespace-normal break-words leading-snug">{opt.label}</span>
                         </div>
                       );
                     })}
@@ -396,7 +460,8 @@ function SelectWithSearch({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
