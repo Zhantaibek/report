@@ -11,7 +11,9 @@ import {
   deleteEmitent,
   type EmitentRow,
 } from '../../api/emitents.ts';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const PAGE_SIZE = 20;
 
 type FieldError = {
   name?: string;
@@ -64,6 +66,7 @@ const emptyForm = () => ({
 export default function Emitents() {
   const [list, setList] = useState<EmitentRow[]>([]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -79,6 +82,10 @@ export default function Emitents() {
   useEffect(() => {
     loadList();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -97,6 +104,10 @@ export default function Emitents() {
       return hay.includes(q);
     });
   }, [list, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openCreate = () => {
     setEditingId(null);
@@ -378,74 +389,149 @@ export default function Emitents() {
               {list.length === 0 ? 'Нет записей.' : 'Ничего не найдено по запросу.'}
             </p>
           ) : (
-            <div className="max-h-[32rem] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-14">ID</TableHead>
-                    <TableHead className="w-16">Код</TableHead>
-                    <TableHead>Наименование</TableHead>
-                    <TableHead>Адрес</TableHead>
-                    <TableHead className="text-right">Уст. кап.</TableHead>
-                    <TableHead className="text-right">Номинал</TableHead>
-                    <TableHead className="w-24 text-right">Действия</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-14">ID</TableHead>
+                  <TableHead className="w-16">Код</TableHead>
+                  <TableHead>Наименование</TableHead>
+                  <TableHead>Адрес</TableHead>
+                  <TableHead className="text-right">Уст. кап.</TableHead>
+                  <TableHead className="text-right">Номинал</TableHead>
+                  <TableHead className="w-24 text-right">Действия</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageItems.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="text-sm text-muted-foreground">{row.id}</TableCell>
+                    <TableCell className="font-mono text-sm">{trimCode(row.code) || '—'}</TableCell>
+                    <TableCell className="max-w-[16rem] truncate" title={row.name ?? undefined}>
+                      {row.name ?? '—'}
+                    </TableCell>
+                    <TableCell className="max-w-[12rem] truncate text-sm text-muted-foreground" title={row.address ?? undefined}>
+                      {row.address ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {formatDecimal(row.infusion, 2)}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {formatDecimal(row.price, 6)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => openEdit(row)}
+                          disabled={loading}
+                          title="Изменить"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(row)}
+                          disabled={loading}
+                          title="Удалить"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-sm text-muted-foreground">{row.id}</TableCell>
-                      <TableCell className="font-mono text-sm">{trimCode(row.code) || '—'}</TableCell>
-                      <TableCell className="max-w-[16rem] truncate" title={row.name ?? undefined}>
-                        {row.name ?? '—'}
-                      </TableCell>
-                      <TableCell className="max-w-[12rem] truncate text-sm text-muted-foreground" title={row.address ?? undefined}>
-                        {row.address ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {formatDecimal(row.infusion, 2)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {formatDecimal(row.price, 6)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-0">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => openEdit(row)}
-                            disabled={loading}
-                            title="Изменить"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(row)}
-                            disabled={loading}
-                            title="Удалить"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           )}
 
-          <p className="text-xs text-muted-foreground pt-2">
-            {filtered.length === list.length
-              ? `${list.length} записей`
-              : `${filtered.length} из ${list.length} записей`}
-          </p>
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {filtered.length > 0 && totalPages > 1 && (
+                <span>Страница {safePage} из {totalPages}</span>
+              )}
+              <span>
+                {search.trim() && filtered.length !== list.length
+                  ? `${filtered.length} из ${list.length} записей`
+                  : `${filtered.length} записей`}
+              </span>
+            </div>
+            {filtered.length > 0 && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(1)}
+                  disabled={safePage === 1}
+                  title="Первая"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <ChevronLeft className="h-3.5 w-3.5 -ml-2" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  title="Назад"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                  .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={`dots-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={p === safePage ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setPage(p as number)}
+                      >
+                        {p}
+                      </Button>
+                    )
+                  )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  title="Вперёд"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  title="Последняя"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5 -ml-2" />
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
