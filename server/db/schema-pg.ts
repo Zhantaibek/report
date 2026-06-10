@@ -133,7 +133,7 @@ DO $$ BEGIN
 EXCEPTION WHEN others THEN NULL;
 END $$;
 
--- Эмитенты (справочник; первичный импорт из QUIK Export: npm run db:import-emitents)
+-- Эмитенты (справочник; синхронизация в QUIK Export при APP_ENV=production)
 CREATE TABLE IF NOT EXISTS emitents (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(255),

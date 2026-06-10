@@ -169,10 +169,35 @@ export default function CurrencyRates() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
           <CardTitle>Курсы валют</CardTitle>
-          <Button onClick={openCreate} size="sm">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Добавить курс
-          </Button>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Дата с</span>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className={`${filterInput} w-36`}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Дата по</span>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className={`${filterInput} w-36`}
+              />
+            </div>
+            {hasFilters && (
+              <Button variant="outline" size="sm" onClick={resetFilters} className="h-8">
+                Сбросить
+              </Button>
+            )}
+            <Button onClick={openCreate} size="sm" className="h-9">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Добавить курс
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Modal
@@ -241,36 +266,6 @@ export default function CurrencyRates() {
             </form>
           </Modal>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Дата с</span>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={(e) => setFilterDateFrom(e.target.value)}
-                className={`${filterInput} w-36`}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Дата по</span>
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={(e) => setFilterDateTo(e.target.value)}
-                className={`${filterInput} w-36`}
-              />
-            </div>
-            {hasFilters && (
-              <Button variant="outline" size="sm" onClick={resetFilters} className="h-8">
-                Сбросить
-              </Button>
-            )}
-            <span className="text-xs text-muted-foreground self-end pb-1 ml-auto">
-              {filtered.length} записей
-            </span>
-          </div>
-
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {list.length === 0 ? 'Нет данных. Добавьте первый курс.' : 'Нет записей по заданным фильтрам.'}
@@ -328,85 +323,87 @@ export default function CurrencyRates() {
                   ))}
                 </TableBody>
               </Table>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-muted-foreground">
-                    Страница {safePage} из {totalPages}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setPage(1)}
-                      disabled={safePage === 1}
-                      title="Первая"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                      <ChevronLeft className="h-3.5 w-3.5 -ml-2" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage === 1}
-                      title="Назад"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
-                      .reduce<(number | '...')[]>((acc, p, i, arr) => {
-                        if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
-                        acc.push(p);
-                        return acc;
-                      }, [])
-                      .map((p, i) =>
-                        p === '...' ? (
-                          <span key={`dots-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
-                        ) : (
-                          <Button
-                            key={p}
-                            variant={p === safePage ? 'default' : 'outline'}
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => setPage(p as number)}
-                          >
-                            {p}
-                          </Button>
-                        )
-                      )}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages}
-                      title="Вперёд"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setPage(totalPages)}
-                      disabled={safePage === totalPages}
-                      title="Последняя"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                      <ChevronRight className="h-3.5 w-3.5 -ml-2" />
-                    </Button>
-                  </div>
-                </div>
-              )}
             </>
           )}
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {filtered.length > 0 && totalPages > 1 && (
+                <span>Страница {safePage} из {totalPages}</span>
+              )}
+              <span>{filtered.length} записей</span>
+            </div>
+            {filtered.length > 0 && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(1)}
+                  disabled={safePage === 1}
+                  title="Первая"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <ChevronLeft className="h-3.5 w-3.5 -ml-2" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  title="Назад"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+                  .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={`dots-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={p === safePage ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setPage(p as number)}
+                      >
+                        {p}
+                      </Button>
+                    )
+                  )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  title="Вперёд"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  title="Последняя"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5 -ml-2" />
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -11,6 +11,7 @@ import Reference from './pages/admin/Reference.tsx';
 import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
 import CurrencyRates from './pages/admin/CurrencyRates.tsx';
 import TradeClasses from './pages/admin/TradeClasses.tsx';
+import Emitents from './pages/admin/Emitents.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="tariffs" element={<CommissionTariffs />} />
           <Route path="currency-rates" element={<CurrencyRates />} />
           <Route path="trade-classes" element={<TradeClasses />} />
+          <Route path="emitents" element={<Emitents />} />
         </Route>
         <Route path="/admin/commission-tariffs" element={<Navigate to="/admin/reference/tariffs" replace />} />
         <Route path="/admin/currency-rates" element={<Navigate to="/admin/reference/currency-rates" replace />} />

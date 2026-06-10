@@ -8,6 +8,7 @@ import dataSourcesRoutes from './data-sources.routes.js';
 import usersRoutes from './users.routes.js';
 import commissionTariffsRoutes from './commission-tariffs.routes.js';
 import tradeClassRulesRoutes from './trade-class-rules.routes.js';
+import emitentsRoutes from './emitents.routes.js';
 import adminRoutes from './admin.routes.js';
 
 const api = Router();
@@ -21,6 +22,7 @@ api.use('/data-sources', dataSourcesRoutes);
 api.use('/users', usersRoutes);
 api.use('/commission-tariffs', commissionTariffsRoutes);
 api.use('/trade-class-rules', tradeClassRulesRoutes);
+api.use('/emitents', emitentsRoutes);
 api.use('/admin', adminRoutes);
 
 export const routes = Router();

@@ -83,23 +83,8 @@ npm run db:seed
 
 Справочники `trade_class_rules`, `commission_tariffs`, `currency_rates`, `emitents` хранятся в APP_DB (источник правды) и **синхронизируются** в QUIK Export как зеркала — только при `APP_ENV=production` (после изменений в админке, при обновлении курсов и при старте сервера). В `development` запись в QUIK отключена. Ручная синхронизация: `POST /api/admin/sync-reference-to-quik` (admin). DDL для QUIK: `docs/quik-export-reference-tables.sql`.
 
-Первичный импорт эмитентов из QUIK в APP_DB (один раз): `npm run db:migrate && npm run db:import-emitents`.
-
 ## Docker (production на сервере)
 
 `docker compose up -d` — APP_DB в контейнере `db` (`APP_DB_HOST=db` в compose). Миграция при старте `app` выполняется в `entrypoint.sh`; CI после деплоя дублирует: `docker compose exec -T app npm run db:migrate:node`.
 
-**Импорт emitents на сервере** (один раз, из контейнера `app` — нужны `POSTGRES_QUIK_*` в `.env` на хосте):
-
-```bash
-cd /path/to/quick_reports   # REMOTE_APP_PATH на сервере
-docker compose exec -T app npm run db:import-emitents:node
-```
-
-Проверка:
-
-```bash
-docker compose exec -T db psql -U postgres -d quik_reports -c "SELECT COUNT(*) FROM emitents;"
-```
-
-После импорта при рестарте `app` справочники (включая `emitents`) синхронизируются в QUIK Export автоматически. Ручной синк: `POST /api/admin/sync-reference-to-quik`.
+При рестарте `app` справочники (включая `emitents`) синхронизируются в QUIK Export автоматически. Ручной синк: `POST /api/admin/sync-reference-to-quik`.
