@@ -28,6 +28,15 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   },
 
+  ldap: {
+    url: process.env.LDAP_URL ?? '',
+    baseDN: process.env.LDAP_BASE_DN ?? '',
+    bindDN: process.env.LDAP_BIND_DN ?? '',
+    bindPassword: process.env.LDAP_BIND_PASSWORD ?? '',
+    userSearchBase: process.env.LDAP_USER_SEARCH_BASE ?? '',
+    bootstrapAdminLogin: process.env.LDAP_BOOTSTRAP_ADMIN ?? '',
+  },
+
   currency: {
     // URL API Национального банка Кыргызской Республики (XML, windows-1251)
     apiUrl: process.env.CURRENCY_API_URL ?? 'https://www.nbkr.kg/XML/daily.xml',

@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { initDb, setDb, closeDb } from './index.js';
 import { config } from '../config/index.js';
 import * as usersRepo from './repositories/users.js';
@@ -8,11 +7,13 @@ import { syncReportForms } from './sync-report-forms.js';
 async function main(): Promise<void> {
   setDb(await initDb(config.database));
 
-  const existingAdmin = await usersRepo.findUserByLogin('admin');
-  if (!existingAdmin) {
-    const hash = bcrypt.hashSync('admin', 10);
-    await usersRepo.createUser('admin', hash, 'admin', 'Administrator');
-    console.log('Created admin user (login: admin, password: admin).');
+  const bootstrapAdmin = config.ldap.bootstrapAdminLogin.trim();
+  if (bootstrapAdmin) {
+    const existing = await usersRepo.findUserByLogin(bootstrapAdmin);
+    if (!existing) {
+      await usersRepo.createUser(bootstrapAdmin, 'admin', null);
+      console.log(`Created bootstrap admin (login: ${bootstrapAdmin}).`);
+    }
   }
 
   await syncReportForms();

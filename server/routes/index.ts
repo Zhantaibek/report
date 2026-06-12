@@ -10,6 +10,8 @@ import commissionTariffsRoutes from './commission-tariffs.routes.js';
 import tradeClassRulesRoutes from './trade-class-rules.routes.js';
 import emitentsRoutes from './emitents.routes.js';
 import adminRoutes from './admin.routes.js';
+// TEMP: открытый /api/instruments — удалить после использования
+import instrumentsRoutes from './instruments.routes.js';
 
 const api = Router();
 const base = config.apiBase;
@@ -24,6 +26,8 @@ api.use('/commission-tariffs', commissionTariffsRoutes);
 api.use('/trade-class-rules', tradeClassRulesRoutes);
 api.use('/emitents', emitentsRoutes);
 api.use('/admin', adminRoutes);
+// TEMP: открытый эндпоинт инструментов Oracle
+api.use('/instruments', instrumentsRoutes);
 
 export const routes = Router();
 routes.use(base, api);

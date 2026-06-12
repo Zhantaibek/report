@@ -8,9 +8,13 @@ export const schema = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   login TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('admin', 'employee')),
   display_name TEXT,
+  email TEXT,
+  position TEXT,
+  phone TEXT,
+  department_name TEXT,
+  organization TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -172,6 +176,32 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE users DROP COLUMN IF EXISTS broker_id;
   END IF;
+END $$;
+
+-- Миграция: удаляем password_hash (авторизация через LDAP)
+DO $$ BEGIN
+  ALTER TABLE users DROP COLUMN IF EXISTS password_hash;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Миграция: поля профиля из LDAP
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email') THEN
+    ALTER TABLE users ADD COLUMN email TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'position') THEN
+    ALTER TABLE users ADD COLUMN position TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'phone') THEN
+    ALTER TABLE users ADD COLUMN phone TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'department_name') THEN
+    ALTER TABLE users ADD COLUMN department_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'organization') THEN
+    ALTER TABLE users ADD COLUMN organization TEXT;
+  END IF;
+EXCEPTION WHEN others THEN NULL;
 END $$;
 
 -- Миграция: только роли admin и employee

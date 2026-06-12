@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyToken } from './service.js';
+import { verifyToken, userRowToAuthUser } from './service.js';
 import { findUserById } from '../db/repositories/users.js';
 import type { AuthUser } from '../types/index.js';
 
@@ -25,12 +25,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     res.status(401).json({ error: 'User not found' });
     return;
   }
-  req.user = {
-    id: user.id,
-    login: user.login,
-    role: user.role,
-    displayName: user.display_name,
-  } as AuthUser;
+  req.user = userRowToAuthUser(user) as AuthUser;
   next();
 }
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   open: boolean;
@@ -20,15 +21,23 @@ export function Modal({ open, onClose, title, children, closeOnBackdropClick = f
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div
-        className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto overflow-x-hidden"
+        className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <div className="px-4 py-3 border-b border-border">
-            <h2 id="modal-title" className="font-semibold text-lg">{title}</h2>
+          <div className="shrink-0 w-full px-4 py-3 border-b border-border flex items-center justify-between gap-3 rounded-t-lg">
+            <h2 id="modal-title" className="font-semibold text-lg truncate">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              aria-label="Закрыть"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         )}
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto flex-1 min-h-0">
           {children}
         </div>
       </div>

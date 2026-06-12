@@ -33,8 +33,17 @@ export interface OracleInstrument {
   extcode: string;
 }
 
-function runJavaBridge(className: string, args: string[]): Promise<string> {
+function runJavaBridge(
+  className: string,
+  args: string[],
+  options: { maxBuffer?: number; timeout?: number } = {},
+): Promise<string> {
   const { host, port, sid, user, password } = config.oracle;
+  const execOptions = {
+    cwd: BRIDGE_DIR,
+    timeout: options.timeout ?? 30000,
+    maxBuffer: options.maxBuffer ?? 1024 * 1024,
+  };
   return new Promise((resolve, reject) => {
     console.log('[oracle-jdbc]', {
       javaBin: JAVA_BIN,
@@ -52,7 +61,7 @@ function runJavaBridge(className: string, args: string[]): Promise<string> {
     execFile(
       JAVA_BIN,
       ['-cp', cp, className, ...baseArgs],
-      { cwd: BRIDGE_DIR, timeout: 30000 },
+      execOptions,
       (err, stdout, stderr) => {
         const errText = (stderr || '').trim();
         if (!err) {
@@ -72,7 +81,7 @@ function runJavaBridge(className: string, args: string[]): Promise<string> {
         execFile(
           JAVA_BIN,
           ['-cp', cp, `${className}.java`, ...baseArgs],
-          { cwd: BRIDGE_DIR, timeout: 30000 },
+          execOptions,
           (err2, stdout2, stderr2) => {
             const errText2 = (stderr2 || '').trim();
             if (err2) {
@@ -96,6 +105,15 @@ export async function queryOracleInstruments(): Promise<OracleInstrument[]> {
     namerus: String(r.namerus ?? ''),
     extcode: String(r.extcode ?? ''),
   }));
+}
+
+/** TEMP: удалить вместе с instruments.routes.ts и OracleCurrInstrumentsAll.java */
+export async function queryOracleCurrInstrumentsAll(): Promise<Record<string, unknown>[]> {
+  const raw = await runJavaBridge('OracleCurrInstrumentsAll', [], {
+    maxBuffer: 128 * 1024 * 1024,
+    timeout: 120000,
+  });
+  return JSON.parse(raw) as Record<string, unknown>[];
 }
 
 export async function queryOracleUsd(

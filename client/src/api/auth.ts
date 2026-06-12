@@ -5,6 +5,11 @@ export interface AuthUser {
   login: string;
   role: 'admin' | 'employee';
   displayName: string | null;
+  email: string | null;
+  position: string | null;
+  phone: string | null;
+  departmentName: string | null;
+  organization: string | null;
 }
 
 export async function login(login: string, password: string): Promise<{ user: AuthUser; token: string }> {

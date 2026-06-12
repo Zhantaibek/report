@@ -84,4 +84,9 @@ export interface AuthUser {
   login: string;
   role: UserRole;
   displayName: string | null;
+  email: string | null;
+  position: string | null;
+  phone: string | null;
+  departmentName: string | null;
+  organization: string | null;
 }
