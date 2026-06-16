@@ -1,5 +1,5 @@
 import type { Trade } from '../types/index.js';
-import { getDataSourceById, getFieldMappingByDataSourceId } from '../config/data-sources.js';
+import { getDataSourceById, getDataSources, getFieldMappingByDataSourceId } from '../config/data-sources.js';
 import { buildSelectQuery } from './build-select.js';
 import { queryPostgres, QuikConnectionError } from './postgres.js';
 import { queryMssql } from './mssql.js';
@@ -270,6 +270,34 @@ export async function getClasses(dataSourceId: number): Promise<ClassItem[]> {
     }
     return [];
   }
+}
+
+export async function getQuikEmitentsCount(): Promise<number> {
+  const sources = getDataSources(true);
+  const queries = [
+    'SELECT COUNT(*)::int AS count FROM emitents',
+    'SELECT COUNT(*)::int AS count FROM "Emitents"',
+    `SELECT COUNT(DISTINCT NULLIF(TRIM(s."SecFullName"), ''))::int AS count
+     FROM (
+       SELECT DISTINCT ON ("SecCode") "SecFullName"
+       FROM "Securities"
+       ORDER BY "SecCode", "SecFullName"
+     ) s
+     WHERE NULLIF(TRIM(s."SecFullName"), '') IS NOT NULL`,
+  ];
+
+  for (const ds of sources) {
+    for (const sql of queries) {
+      try {
+        const rows = await queryDs(ds, sql);
+        const count = Number(getField(rows[0] ?? {}, 'count') ?? 0);
+        if (Number.isFinite(count) && count > 0) return count;
+      } catch {
+        // table/query may be unavailable — try next source
+      }
+    }
+  }
+  return 0;
 }
 
 export async function getFirms(dataSourceId: number): Promise<FirmItem[]> {

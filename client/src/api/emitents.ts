@@ -44,6 +44,10 @@ export function getEmitents() {
   return api.get<EmitentRow[]>('/emitents');
 }
 
+export function getEmitentsCount() {
+  return api.get<{ count: number }>('/emitents/count');
+}
+
 export function createEmitent(body: CreateEmitentBody) {
   return api.post<EmitentRow>('/emitents', body);
 }

@@ -1,32 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table.tsx';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { getCurrencyRates, getCurrencyRatesHistory, refreshCurrencyRates } from '../api/currency-rates.ts';
+import { ChevronLeft, ChevronRight, DollarSign, Handshake, Scale, TrendingUp } from 'lucide-react';
+import { getCurrencyRates } from '../api/currency-rates.ts';
 import type { CurrencyRate } from '../api/currency-rates.ts';
 import ReportChart from '../components/ReportChart.tsx';
 import { getDailyVolumes, getTodayTrades, type DailyVolumePoint, type TodayTrade } from '../api/reports.ts';
 
 export default function Dashboard() {
   const [rates, setRates] = useState<CurrencyRate[]>([]);
-  const [ratesHistory, setRatesHistory] = useState<CurrencyRate[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
   const [todayTrades, setTodayTrades] = useState<TodayTrade[]>([]);
   const [todayPage, setTodayPage] = useState(1);
   const [todayPerPage, setTodayPerPage] = useState(20);
   const [todayLoading, setTodayLoading] = useState(false);
   const [todayError, setTodayError] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [rateMonth, setRateMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [volumes, setVolumes] = useState<DailyVolumePoint[]>([]);
   const [volumesLoading, setVolumesLoading] = useState(false);
   const [volumesError, setVolumesError] = useState<string | null>(null);
 
   useEffect(() => {
     getCurrencyRates().then(setRates).catch(() => {});
-    getCurrencyRatesHistory().then(setRatesHistory).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -143,110 +138,56 @@ export default function Dashboard() {
     };
   }, [volumes]);
 
-  const currencyChartData = useMemo(() => {
-    if (ratesHistory.length === 0) {
-      return { labels: [], series: [] as { name: string; data: number[] }[] };
-    }
-    const usd = ratesHistory
-      .filter((r) => r.currencyCode === 'USD' && r.rateDate?.startsWith(rateMonth))
-      .sort((a, b) => a.rateDate.localeCompare(b.rateDate));
-    if (usd.length === 0) {
-      return { labels: [], series: [] as { name: string; data: number[] }[] };
-    }
-    const labels = usd.map((r) => {
-      const d = r.rateDate.slice(0, 10);
-      const [, m, day] = d.split('-');
-      return `${day}.${m}`;
-    });
-    return {
-      labels,
-      series: [{ name: 'USD/сом', data: usd.map((r) => r.rate) }],
-    };
-  }, [ratesHistory, rateMonth]);
+  const todayVolume = useMemo(
+    () => todayTrades.reduce((sum, t) => sum + t.value, 0),
+    [todayTrades],
+  );
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setMessage(null);
-    try {
-      const res = await refreshCurrencyRates();
-      setRates(res.rates);
-      getCurrencyRatesHistory().then(setRatesHistory).catch(() => {});
-      setMessage({ text: 'Курс обновлён', type: 'success' });
-    } catch {
-      setMessage({ text: 'Ошибка при обновлении', type: 'info' });
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const avgDealPrice = useMemo(() => {
+    if (todayTrades.length === 0) return null;
+    return todayTrades.reduce((sum, t) => sum + t.price, 0) / todayTrades.length;
+  }, [todayTrades]);
+
+  const usdRate = useMemo(
+    () => rates.find((r) => r.currencyCode === 'USD') ?? rates[0] ?? null,
+    [rates],
+  );
+
+  const stats = [
+    {
+      title: 'Объём торгов за сегодня',
+      value: todayLoading
+        ? '…'
+        : `${todayVolume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом`,
+      icon: TrendingUp,
+    },
+    {
+      title: 'Количество сделок за сегодня',
+      value: todayLoading ? '…' : todayTrades.length.toLocaleString('ru-RU'),
+      icon: Handshake,
+    },
+    {
+      title: 'Средняя цена сделки за сегодня',
+      value: todayLoading
+        ? '…'
+        : avgDealPrice == null
+          ? '—'
+          : `${avgDealPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом`,
+      icon: Scale,
+    },
+    {
+      title: 'Курс USD/KGS',
+      value: usdRate ? `${usdRate.rate.toFixed(2)} сом` : '—',
+      icon: DollarSign,
+      hint: 'Источник: НБКР',
+      hintLink: 'https://www.nbkr.kg/index.jsp?lang=RUS',
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Верх: два блока по 50% */}
-      <div className="flex flex-col md:flex-row md:gap-6 md:items-stretch">
-        {/* Лево: Курсы валют */}
-        <Card className="w-full md:w-1/2">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex items-baseline gap-3">
-                  <CardTitle>Курсы валют</CardTitle>
-                  {rates[0] && (
-                    <span className="text-sm text-muted-foreground">
-                      USD: {rates[0].rate.toFixed(2)} сом
-                    </span>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="h-8 w-8"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Месяц:</span>
-                  <input
-                    type="month"
-                    value={rateMonth}
-                    onChange={(e) => setRateMonth(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                  />
-                </div>
-                <a
-                  href="https://www.nbkr.kg/index.jsp?lang=RUS"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Источник: НБКР
-                </a>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-2 pb-3">
-            {message && (
-              <p
-                className={`text-sm mb-3 ${
-                  message.type === 'success' ? 'text-green-600' : 'text-muted-foreground'
-                }`}
-              >
-                {message.text}
-              </p>
-            )}
-            {currencyChartData.labels.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Нет данных по курсу USD за выбранный месяц.</p>
-            ) : (
-              <ReportChart labels={currencyChartData.labels} series={currencyChartData.series} type="area" />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Право: График объёмов */}
-        <Card className="w-full md:w-1/2 mt-6 md:mt-0">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+        <Card className="w-full lg:w-3/5 lg:min-w-0">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
               <CardTitle>Объёмы сделок по дням</CardTitle>
@@ -261,7 +202,7 @@ export default function Dashboard() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-h-[280px]">
             {volumesLoading ? (
               <p className="text-sm text-muted-foreground">Загрузка…</p>
             ) : volumesError ? (
@@ -273,6 +214,40 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        <div className="grid w-full grid-cols-2 gap-4 lg:w-2/5 lg:min-w-0">
+          {stats.map((item) => (
+            <Card key={item.title} className="h-full">
+              <CardContent className="flex h-full flex-col justify-center gap-3 p-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3d848c]/10 text-[#3d848c]">
+                    <item.icon className="h-4 w-4" />
+                  </div>
+                  <p className="text-xs leading-tight text-muted-foreground">{item.title}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-semibold">{item.value}</p>
+                  {'hint' in item && item.hint ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      {item.hintLink ? (
+                        <a
+                          href={item.hintLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {item.hint}
+                        </a>
+                      ) : (
+                        item.hint
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Низ: Торги за день */}
@@ -289,6 +264,62 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">Сделок не найдено.</p>
           ) : (
             <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Дата</TableHead>
+                    <TableHead>№ сделки</TableHead>
+                    <TableHead>Покупатель</TableHead>
+                    <TableHead>Продавец</TableHead>
+                    <TableHead className="text-right">Кол-во ЦБ</TableHead>
+                    <TableHead className="text-right">Цена</TableHead>
+                    <TableHead className="text-right">Сумма</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupedTodayTrades.map((cls) => (
+                    <Fragment key={cls.classCode}>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableCell colSpan={7} className="py-2 text-sm font-semibold">
+                          Класс: {cls.className || cls.classCode}
+                        </TableCell>
+                      </TableRow>
+                      {cls.securities.map((sec) => (
+                        <Fragment key={`${cls.classCode}-${sec.secCode}`}>
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={7} className="py-1.5 text-xs font-medium text-muted-foreground">
+                              ЦБ: {sec.secFullName || sec.secCode} ({sec.secCode})
+                            </TableCell>
+                          </TableRow>
+                          {sec.trades.map((t) => (
+                            <TableRow key={t.id}>
+                              <TableCell>{t.tradeDate}</TableCell>
+                              <TableCell>{t.id}</TableCell>
+                              <TableCell>{t.buyerName || ''}</TableCell>
+                              <TableCell>{t.sellerName || ''}</TableCell>
+                              <TableCell className="text-right">
+                                {t.quantity.toLocaleString('ru-RU')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {t.price.toLocaleString('ru-RU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {t.value.toLocaleString('ru-RU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
                   <p className="text-xs text-muted-foreground">
@@ -337,60 +368,6 @@ export default function Dashboard() {
                   </Button>
                 </div>
               </div>
-              {groupedTodayTrades.map((cls) => (
-                <div key={cls.classCode} className="space-y-2">
-                  <h3 className="text-sm font-semibold">
-                    Класс: {cls.className || cls.classCode}
-                  </h3>
-                  <div className="space-y-3">
-                    {cls.securities.map((sec) => (
-                      <div key={sec.secCode}>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                          ЦБ: {sec.secFullName || sec.secCode} ({sec.secCode})
-                        </p>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Дата</TableHead>
-                              <TableHead>№ сделки</TableHead>
-                              <TableHead>Покупатель</TableHead>
-                              <TableHead>Продавец</TableHead>
-                              <TableHead className="text-right">Кол-во ЦБ</TableHead>
-                              <TableHead className="text-right">Цена</TableHead>
-                              <TableHead className="text-right">Сумма</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sec.trades.map((t) => (
-                              <TableRow key={t.id}>
-                                <TableCell>{t.tradeDate}</TableCell>
-                                <TableCell>{t.id}</TableCell>
-                                <TableCell>{t.buyerName || ''}</TableCell>
-                                <TableCell>{t.sellerName || ''}</TableCell>
-                                <TableCell className="text-right">
-                                  {t.quantity.toLocaleString('ru-RU')}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {t.price.toLocaleString('ru-RU', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {t.value.toLocaleString('ru-RU', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </CardContent>

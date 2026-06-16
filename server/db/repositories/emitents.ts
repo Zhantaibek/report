@@ -51,6 +51,14 @@ export async function getAllEmitents(): Promise<Emitent[]> {
   return result.rows;
 }
 
+export async function getEmitentsCount(): Promise<number> {
+  const db = getDb();
+  const result = await db.query<{ count: number }>(
+    'SELECT COUNT(*)::int AS count FROM emitents',
+  );
+  return result.rows[0]?.count ?? 0;
+}
+
 export async function createEmitent(data: CreateEmitentDto): Promise<Emitent> {
   const db = getDb();
   const result = await db.query<Emitent>(

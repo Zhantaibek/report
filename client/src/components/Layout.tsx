@@ -83,11 +83,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {currentTheme.icon}
             </button>
 
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              title="Профиль"
+              className="flex items-center gap-2 rounded-lg px-1 py-1 transition-all duration-150 hover:bg-white/15"
+            >
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>
                 {(user?.displayName || user?.login || '?')[0].toUpperCase()}
               </div>
-              <div className="flex flex-col leading-tight">
+              <div className="flex flex-col leading-tight text-left">
                 <span className="text-white text-xs font-semibold">
                   {user?.displayName || user?.login}
                 </span>
@@ -95,7 +100,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {user?.role}
                 </span>
               </div>
-            </div>
+            </button>
 
             <button
               onClick={handleLogout}

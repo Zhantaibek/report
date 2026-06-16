@@ -12,6 +12,7 @@ import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
 import CurrencyRates from './pages/admin/CurrencyRates.tsx';
 import TradeClasses from './pages/admin/TradeClasses.tsx';
 import Emitents from './pages/admin/Emitents.tsx';
+import Profile from './pages/Profile.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,6 +52,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

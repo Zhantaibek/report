@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { authMiddleware, requireRole } from '../auth/middleware.js';
 import {
   getAllEmitents,
+  getEmitentsCount,
   createEmitent,
   updateEmitent,
   deleteEmitent,
 } from '../db/repositories/emitents.js';
+import { getQuikEmitentsCount } from '../data-sources/index.js';
 import { scheduleReferenceSyncToQuik } from '../db/sync-reference-to-quik.js';
 
 const router = Router();
@@ -14,6 +16,14 @@ router.use(authMiddleware);
 router.get('/', async (_req, res) => {
   const list = await getAllEmitents();
   res.json(list);
+});
+
+router.get('/count', async (_req, res) => {
+  let count = await getEmitentsCount();
+  if (count === 0) {
+    count = await getQuikEmitentsCount();
+  }
+  res.json({ count });
 });
 
 router.use(requireRole('admin'));
