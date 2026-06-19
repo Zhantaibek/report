@@ -192,63 +192,47 @@ ORDER BY t."TradeNum"
  * - Также возвращает общую информацию из Securities
  */
 const auctionSummaryQuery = `
-WITH trade_sums AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t."TradeDate",
-    t."ClassCode",
-    COALESCE(t."Yield", 0) AS "Yield",
-    t."TradeNum",
-    t."Price",
-    t."Qty",
-    t."Value",
-    t."OrderNum",
-    t."SecCode"
-  FROM "Trades" t
-  WHERE t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
-    AND ${TRADES_OPTIONAL_FILTERS}
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-)
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteSecuritiesDedup()},
+${cteClassesDedup()}
 SELECT
-  ROUND(t."Price", 2) AS "price",
-  t."SecCode" AS "secCode",
-  to_char(MAX(t."TradeDate"), 'YYYY-MM-DD') AS "tradeDate",
-  MAX(t."ClassCode") AS "classCode",
-  MAX(COALESCE(cl."ClassName", t."ClassCode")) AS "className",
-  SUM(t."Qty" * COALESCE(s."FaceValue", 1)) AS "nominalSum",
-  SUM(t."Qty" * t."Price") AS "valueActual",
-  ROUND(AVG(t."Yield"), 2) AS "yieldPercent",
-  ROUND(AVG(t."Yield"), 2) AS "yieldByPrice",
-  SUM(t."Qty") AS "totalQty",
+  ROUND(b."Price", 2) AS "price",
+  b."SecCode" AS "secCode",
+  to_char(MAX(b."TradeDate"), 'YYYY-MM-DD') AS "tradeDate",
+  MAX(b."ClassCode") AS "classCode",
+  MAX(COALESCE(cl."ClassName", b."ClassCode")) AS "className",
+  SUM(b."Qty" * COALESCE(s."FaceValue", 1)) AS "nominalSum",
+  SUM(b."Qty" * b."Price") AS "valueActual",
+  ROUND(AVG(COALESCE(b."Yield", 0)), 2) AS "yieldPercent",
+  ROUND(AVG(COALESCE(b."Yield", 0)), 2) AS "yieldByPrice",
+  SUM(b."Qty") AS "totalQty",
   MAX(s."SecFullName") AS "secFullName",
   CASE 
-    WHEN t."Price" > 0 THEN 'Конкурентная'
+    WHEN b."Price" > 0 THEN 'Конкурентная'
     ELSE 'Неконкурентная'
   END AS "bidType"
-FROM trade_sums t
-LEFT JOIN "Securities" s ON s."SecCode" = t."SecCode"
-LEFT JOIN "Classes" cl ON cl."ClassCode" = t."ClassCode"
-GROUP BY t."Price", t."SecCode", 
+FROM buy_trades b
+LEFT JOIN securities_dedup s ON s."SecCode" = b."SecCode"
+LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
+GROUP BY b."Price", b."SecCode", 
   CASE 
-    WHEN t."Price" > 0 THEN 'Конкурентная'
+    WHEN b."Price" > 0 THEN 'Конкурентная'
     ELSE 'Неконкурентная'
   END
-ORDER BY t."Price" DESC
+ORDER BY b."Price" DESC
 `.trim();
 
 /**
  * Вторая сводная ведомость — сравнение текущего и предыдущего аукциона.
  * Одна дата: $1 = дата текущего аукциона (приложение передаёт также $2 = dateTo, используем COALESCE($1,$2)).
  */
+const AUCTION2_DATE_FILTER = 't."TradeDate"::date <= (COALESCE($1, $2))::date';
+const AUCTION_SINGLE_DATE_FILTER = 't."TradeDate"::date = (COALESCE($1, $2))::date';
 const auctionSummary2Query = `
 WITH
-unique_trades AS (
-    SELECT DISTINCT ON (t."TradeNum")
-        t.*
-    FROM "Trades" t
-    WHERE t."TradeDate"::date <= (COALESCE($1, $2))::date
-      AND ${TRADES_OPTIONAL_FILTERS}
-    ORDER BY t."TradeNum", t."TradeDate" DESC
-),
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION2_DATE_FILTER)},
+${cteSecuritiesDedup()},
 
 -- Доходность при макс/мин цене за один проход
 ranked AS (
@@ -256,7 +240,7 @@ ranked AS (
         "TradeDate", "SecCode", "Price", "Yield",
         ROW_NUMBER() OVER (PARTITION BY "TradeDate", "SecCode" ORDER BY "Price" DESC NULLS LAST) AS rn_desc,
         ROW_NUMBER() OVER (PARTITION BY "TradeDate", "SecCode" ORDER BY "Price" ASC NULLS FIRST) AS rn_asc
-    FROM unique_trades
+    FROM buy_trades
 ),
 yield_at_prices AS (
     SELECT
@@ -281,8 +265,8 @@ auctions AS (
         y.yield_by_max_price,
         MIN(a."Price") AS cutoff_price,
         y.yield_by_cutoff_price
-    FROM unique_trades a
-    LEFT JOIN "Securities" s ON s."SecCode" = a."SecCode"
+    FROM buy_trades a
+    LEFT JOIN securities_dedup s ON s."SecCode" = a."SecCode"
     LEFT JOIN yield_at_prices y ON y."TradeDate" = a."TradeDate" AND y."SecCode" = a."SecCode"
     GROUP BY a."TradeDate", a."SecCode", y.yield_by_max_price, y.yield_by_cutoff_price
 ),
@@ -302,8 +286,8 @@ orders_agg AS (
         SUM(o."Qty") AS qty_total,
         SUM(o."Qty" * COALESCE(s."FaceValue", 1)) AS value_nominal_total,
         SUM(o."Value") AS value_actual_total
-    FROM unique_trades o
-    LEFT JOIN "Securities" s ON s."SecCode" = o."SecCode"
+    FROM buy_trades o
+    LEFT JOIN securities_dedup s ON s."SecCode" = o."SecCode"
     GROUP BY o."TradeDate", o."SecCode"
 ),
 
@@ -374,23 +358,16 @@ WHERE cur."TradeDate"::date = (COALESCE($1, $2))::date
  */
 const auctionBidClassificationQuery = `
 WITH
-unique_trades AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t."TradeDate", t."SecCode", t."FirmName",
-    t."Price", t."Qty", t."Value", COALESCE(t."Yield", 0) AS "Yield"
-  FROM "Trades" t
-  WHERE t."TradeDate"::date = (COALESCE($1, $2))::date
-    AND ${TRADES_OPTIONAL_FILTERS}
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-),
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteSecuritiesDedup()},
 auction_totals AS (
   SELECT
     u."TradeDate",
     u."SecCode",
     SUM(u."Qty" * COALESCE(s."FaceValue", 1)) AS issue_volume,
     SUM(CASE WHEN u."Price" = 0 THEN u."Value" ELSE 0 END) AS non_competitive_amount
-  FROM unique_trades u
-  LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
+  FROM buy_trades u
+  LEFT JOIN securities_dedup s ON s."SecCode" = u."SecCode"
   GROUP BY u."TradeDate", u."SecCode"
 ),
 by_dealer AS (
@@ -400,9 +377,9 @@ by_dealer AS (
     COALESCE(NULLIF(TRIM(u."FirmName"), ''), '—') AS dealer_name,
     SUM(u."Qty" * COALESCE(s."FaceValue", 1)) AS nominal_value,
     ROUND(SUM(u."Qty" * u."Price") / NULLIF(SUM(u."Qty"), 0), 2) AS bid_price,
-    ROUND(SUM(u."Qty" * u."Yield") / NULLIF(SUM(u."Qty"), 0), 2) AS yield_pct
-  FROM unique_trades u
-  LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
+    ROUND(SUM(u."Qty" * COALESCE(u."Yield", 0)) / NULLIF(SUM(u."Qty"), 0), 2) AS yield_pct
+  FROM buy_trades u
+  LEFT JOIN securities_dedup s ON s."SecCode" = u."SecCode"
   GROUP BY u."TradeDate", u."SecCode", u."FirmName"
 )
 SELECT
@@ -425,16 +402,10 @@ ORDER BY b."SecCode", b."TradeDate", b.nominal_value DESC
  * итоги размещения. Объём эмиссии и кол-во ГЦБ берутся из Securities.
  */
 const additionalPlacementQuery = `
-WITH unique_trades AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t."TradeDate", t."SecCode", t."ClassCode",
-    t."FirmId", t."FirmName",
-    t."Price", t."Qty", t."Value", COALESCE(t."Yield", 0) AS "Yield"
-  FROM "Trades" t
-  WHERE t."TradeDate"::date = (COALESCE($1, $2))::date
-    AND ${TRADES_OPTIONAL_FILTERS}
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-)
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteSecuritiesDedup()},
+${cteClassesDedup()}
 SELECT
   u."SecCode"                                                                       AS sec_code,
   to_char(u."TradeDate", 'YYYY-MM-DD')                                               AS trade_date,
@@ -445,7 +416,7 @@ SELECT
   SUM(u."Qty")                                                                      AS issue_qty,
   0                                                                                 AS coupon_rate,
   ROUND(SUM(u."Qty" * u."Price") / NULLIF(SUM(u."Qty"), 0), 2)                     AS avg_price,
-  ROUND(SUM(u."Qty" * u."Yield") / NULLIF(SUM(u."Qty"), 0), 2)                     AS avg_yield,
+  ROUND(SUM(u."Qty" * COALESCE(u."Yield", 0)) / NULLIF(SUM(u."Qty"), 0), 2)         AS avg_yield,
   SUM(u."Qty")                                                                      AS total_qty,
   SUM(u."Value")                                                                    AS total_value,
   COUNT(DISTINCT u."FirmId")                                                        AS participant_count,
@@ -453,9 +424,9 @@ SELECT
   COUNT(DISTINCT u."FirmId")                                                        AS institutional_investors,
   COUNT(DISTINCT u."FirmId")                                                        AS resident_count,
   0                                                                                 AS non_resident_count
-FROM unique_trades u
-LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
-LEFT JOIN "Classes" c ON c."ClassCode" = u."ClassCode"
+FROM buy_trades u
+LEFT JOIN securities_dedup s ON s."SecCode" = u."SecCode"
+LEFT JOIN classes_dedup c ON c."ClassCode" = u."ClassCode"
 GROUP BY u."SecCode", u."TradeDate"
 ORDER BY u."TradeDate", u."SecCode"
 `.trim();
@@ -467,23 +438,16 @@ ORDER BY u."TradeDate", u."SecCode"
  */
 const auctionCentralDepositoryQuery = `
 WITH
-unique_trades AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t."TradeDate", t."SecCode", t."FirmName",
-    t."Price", t."Qty", t."Value", COALESCE(t."Yield", 0) AS "Yield"
-  FROM "Trades" t
-  WHERE t."TradeDate"::date = (COALESCE($1, $2))::date
-    AND ${TRADES_OPTIONAL_FILTERS}
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-),
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteSecuritiesDedup()},
 auction_totals AS (
   SELECT
     u."TradeDate",
     u."SecCode",
     SUM(u."Qty" * COALESCE(s."FaceValue", 1)) AS issue_volume,
     SUM(CASE WHEN u."Price" = 0 THEN u."Value" ELSE 0 END) AS non_competitive_amount
-  FROM unique_trades u
-  LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
+  FROM buy_trades u
+  LEFT JOIN securities_dedup s ON s."SecCode" = u."SecCode"
   GROUP BY u."TradeDate", u."SecCode"
 ),
 by_dealer AS (
@@ -494,9 +458,9 @@ by_dealer AS (
     SUM(u."Qty") AS actual_qty,
     SUM(u."Value") AS actual_value,
     ROUND(SUM(u."Qty" * u."Price") / NULLIF(SUM(u."Qty"), 0), 2) AS bid_price,
-    ROUND(SUM(u."Qty" * u."Yield") / NULLIF(SUM(u."Qty"), 0), 2) AS yield_pct
-  FROM unique_trades u
-  LEFT JOIN "Securities" s ON s."SecCode" = u."SecCode"
+    ROUND(SUM(u."Qty" * COALESCE(u."Yield", 0)) / NULLIF(SUM(u."Qty"), 0), 2) AS yield_pct
+  FROM buy_trades u
+  LEFT JOIN securities_dedup s ON s."SecCode" = u."SecCode"
   GROUP BY u."TradeDate", u."SecCode", u."FirmName"
 )
 SELECT

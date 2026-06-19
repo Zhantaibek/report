@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { cn } from '../../lib/utils.ts';
 import { Input } from './input.tsx';
 
 function isoToDdMmYyyy(iso: string): string {
@@ -28,9 +29,10 @@ export function DateInput({
 }: DateInputProps) {
   const dateRef = useRef<HTMLInputElement>(null);
   const display = value ? isoToDdMmYyyy(value) : '';
+  const fullWidth = /\bw-full\b/.test(className);
 
   return (
-    <div className="relative inline-block">
+    <div className={cn('relative', fullWidth ? 'block w-full' : 'inline-block')}>
       <input
         ref={dateRef}
         type="date"

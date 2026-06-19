@@ -12,6 +12,8 @@ import CommissionTariffs from './pages/admin/CommissionTariffs.tsx';
 import CurrencyRates from './pages/admin/CurrencyRates.tsx';
 import TradeClasses from './pages/admin/TradeClasses.tsx';
 import Emitents from './pages/admin/Emitents.tsx';
+import Brokers from './pages/admin/Brokers.tsx';
+import EmailReports from './pages/admin/EmailReports.tsx';
 import Profile from './pages/Profile.tsx';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -92,6 +94,8 @@ export default function App() {
           <Route path="currency-rates" element={<CurrencyRates />} />
           <Route path="trade-classes" element={<TradeClasses />} />
           <Route path="emitents" element={<Emitents />} />
+          <Route path="brokers" element={<Brokers />} />
+          <Route path="email-reports" element={<EmailReports />} />
         </Route>
         <Route path="/admin/commission-tariffs" element={<Navigate to="/admin/reference/tariffs" replace />} />
         <Route path="/admin/currency-rates" element={<Navigate to="/admin/reference/currency-rates" replace />} />

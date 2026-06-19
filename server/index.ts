@@ -6,6 +6,7 @@ import { isQuikConfigured } from './config/quik-db.js';
 import { canMutateQuikExport, getAppEnv } from './config/app-env.js';
 import app from './app.js';
 import { startCurrencyRatesJob } from './jobs/currency-rates.js';
+import { startEmailReportsJob } from './jobs/email-reports.js';
 
 const server = await (async () => {
   setDb(await initDb(config.database));
@@ -20,6 +21,7 @@ const server = await (async () => {
 })();
 
 startCurrencyRatesJob();
+startEmailReportsJob();
 
 process.on('SIGTERM', async () => {
   server.close();

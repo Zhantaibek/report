@@ -46,6 +46,22 @@ export const config = {
     utcOffsetHours: parseInt(process.env.CURRENCY_UTC_OFFSET ?? '6', 10),
   },
 
+  smtp: {
+    host: process.env.SMTP_HOST ?? '',
+    port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER ?? '',
+    password: process.env.SMTP_PASSWORD ?? '',
+    from: process.env.SMTP_FROM ?? '',
+    tlsRejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true',
+  },
+
+  emailReports: {
+    dailyHour: parseInt(process.env.EMAIL_REPORTS_DAILY_HOUR ?? '18', 10),
+    dailyMinute: parseInt(process.env.EMAIL_REPORTS_DAILY_MINUTE ?? '0', 10),
+    utcOffsetHours: parseInt(process.env.EMAIL_REPORTS_UTC_OFFSET ?? '6', 10),
+  },
+
   oracle: {
     host: process.env.ORACLE_DB_HOST ?? '',
     port: parseInt(process.env.ORACLE_DB_PORT ?? '1521', 10),

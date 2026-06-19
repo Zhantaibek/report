@@ -160,11 +160,169 @@ CREATE TABLE IF NOT EXISTS trade_class_rules (
   market_type TEXT NOT NULL CHECK (market_type IN ('primary', 'secondary'))
 );
 
--- Миграция: удаляем таблицы data_sources, field_mappings, brokers (перенесены в код / .env)
+-- Миграция: удаляем устаревшие таблицы data_sources, field_mappings
 DO $$ BEGIN
   DROP TABLE IF EXISTS field_mappings;
   DROP TABLE IF EXISTS data_sources;
-  DROP TABLE IF EXISTS brokers;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Брокеры — получатели email-отчётов (firm_id / name из QUIK Firms)
+CREATE TABLE IF NOT EXISTS brokers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  firm_id TEXT,
+  address TEXT,
+  contacts TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokers_email ON brokers(LOWER(email));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brokers_firm_id ON brokers(firm_id) WHERE firm_id IS NOT NULL AND firm_id <> '';
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'brokers' AND column_name = 'address'
+  ) THEN
+    ALTER TABLE brokers ADD COLUMN address TEXT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'brokers' AND column_name = 'contacts'
+  ) THEN
+    ALTER TABLE brokers ADD COLUMN contacts TEXT;
+  END IF;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Отправленные email-отчёты: один файл на тип + дату, рассылка всем брокерам
+CREATE TABLE IF NOT EXISTS email_reports (
+  id SERIAL PRIMARY KEY,
+  report_code TEXT NOT NULL,
+  report_name TEXT NOT NULL,
+  report_date DATE NOT NULL,
+  filename TEXT NOT NULL DEFAULT '',
+  broker_ids INTEGER[] NOT NULL DEFAULT '{}',
+  sent_at TIMESTAMPTZ,
+  send_status TEXT NOT NULL DEFAULT 'pending' CHECK(send_status IN ('pending', 'sent', 'failed', 'partial')),
+  send_error TEXT,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (report_code, report_date)
+);
+CREATE INDEX IF NOT EXISTS idx_email_reports_report_date ON email_reports(report_date DESC);
+
+-- Миграция: email_report_brokers -> одна таблица email_reports
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'filename'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN filename TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'content_type'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN content_type TEXT NOT NULL DEFAULT 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'file_data'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN file_data BYTEA NOT NULL DEFAULT '\\x';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'broker_ids'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN broker_ids INTEGER[] NOT NULL DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'sent_at'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN sent_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'send_status'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN send_status TEXT NOT NULL DEFAULT 'pending';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_reports' AND column_name = 'send_error'
+  ) THEN
+    ALTER TABLE email_reports ADD COLUMN send_error TEXT;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_report_brokers') THEN
+    UPDATE email_reports er
+    SET
+      filename = sub.filename,
+      content_type = sub.content_type,
+      file_data = sub.file_data,
+      broker_ids = sub.broker_ids,
+      sent_at = sub.sent_at,
+      send_status = sub.send_status,
+      send_error = sub.send_error
+    FROM (
+      SELECT
+        erb.email_report_id,
+        (array_agg(erb.filename ORDER BY erb.id))[1] AS filename,
+        (array_agg(erb.content_type ORDER BY erb.id))[1] AS content_type,
+        (array_agg(erb.file_data ORDER BY erb.id))[1] AS file_data,
+        array_agg(DISTINCT erb.broker_id ORDER BY erb.broker_id) AS broker_ids,
+        MAX(erb.sent_at) AS sent_at,
+        CASE
+          WHEN BOOL_AND(erb.send_status = 'sent') THEN 'sent'
+          WHEN BOOL_AND(erb.send_status = 'pending') THEN 'pending'
+          WHEN BOOL_OR(erb.send_status = 'failed') AND BOOL_OR(erb.send_status = 'sent') THEN 'partial'
+          WHEN BOOL_OR(erb.send_status = 'failed') THEN 'failed'
+          ELSE 'pending'
+        END AS send_status,
+        NULLIF(string_agg(DISTINCT erb.send_error, '; ') FILTER (WHERE erb.send_error IS NOT NULL), '') AS send_error
+      FROM email_report_brokers erb
+      GROUP BY erb.email_report_id
+    ) sub
+    WHERE er.id = sub.email_report_id;
+
+    DROP TABLE email_report_brokers;
+  END IF;
+
+  ALTER TABLE email_reports DROP COLUMN IF EXISTS broker_id;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE t.relname = 'email_reports' AND c.contype = 'u'
+      AND pg_get_constraintdef(c.oid) LIKE '%(report_code, report_date)%'
+  ) THEN
+    DELETE FROM email_reports er
+    WHERE er.id NOT IN (
+      SELECT MIN(id) FROM email_reports GROUP BY report_code, report_date
+    );
+    ALTER TABLE email_reports
+      ADD CONSTRAINT email_reports_report_code_report_date_key UNIQUE (report_code, report_date);
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_email_reports_broker_ids ON email_reports USING GIN (broker_ids);
+
+-- Миграция: файлы не храним в БД (генерация при отправке/скачивании)
+DO $$ BEGIN
+  ALTER TABLE email_reports DROP COLUMN IF EXISTS file_data;
+  ALTER TABLE email_reports DROP COLUMN IF EXISTS content_type;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- Миграция: удаляем устаревшие индексы если остались
+DO $$ BEGIN
+  DROP INDEX IF EXISTS idx_email_reports_sent_at;
+  DROP INDEX IF EXISTS idx_email_reports_broker;
 EXCEPTION WHEN others THEN NULL;
 END $$;
 
