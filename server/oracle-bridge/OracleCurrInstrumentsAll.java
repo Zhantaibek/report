@@ -68,7 +68,7 @@ public class OracleCurrInstrumentsAll {
         String url = "jdbc:oracle:thin:@" + host + ":" + port + ":" + sid;
         Class.forName("oracle.jdbc.driver.OracleDriver");
 
-        String sql = "SELECT * FROM ts.CURRINSTRUMENT t ORDER BY t.ID";
+        String sql = "SELECT t.namerus, t.nameeng, shortname, extcode, nominal, cupontax, paycnt, ts.makedate(opendate), ts.makedate(xdate), ts.makedate(pastpaydate) FROM TS.CURRINSTRUMENT t";
 
         try (Connection conn = DriverManager.getConnection(url, user, password);
              PreparedStatement ps = conn.prepareStatement(sql);
