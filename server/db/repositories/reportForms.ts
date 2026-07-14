@@ -61,3 +61,9 @@ export async function updateReportFormByCode(
     await db.query('UPDATE report_forms SET description = $1 WHERE code = $2', [data.description, code]);
   }
 }
+
+export async function deleteReportFormsByCodePrefix(prefix: string): Promise<number> {
+  const db = getDb();
+  const result = await db.query('DELETE FROM report_forms WHERE code LIKE $1', [`${prefix}%`]);
+  return result.rowCount ?? 0;
+}

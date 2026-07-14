@@ -89,7 +89,7 @@ export function StateHoldingForm5Top5Report({ data }: Props) {
           <tbody>
             {data.participants.map((p) => (
               <React.Fragment key={p.seqNo}>
-                <tr className="bg-emerald-50/80">
+                <tr className="bg-emerald-50">
                   <td className="border border-border px-2 py-1 text-center align-middle">{p.seqNo}</td>
                   <td className="border border-border px-2 py-1 font-medium" colSpan={6}>
                     Участник торгов: {p.participantName}

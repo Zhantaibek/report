@@ -23,7 +23,7 @@ export function ReportHeader({ formNumber, title, periodFrom, periodTo }: Report
           <img
             src="/favicon.png"
             alt="KSE Logo"
-            className="h-14 w-14 shrink-0 rounded object-contain"
+            className="h-16 w-16 shrink-0 rounded object-contain"
           />
           <div>
             <p className="font-semibold text-foreground">Кыргызская Фондовая Биржа</p>

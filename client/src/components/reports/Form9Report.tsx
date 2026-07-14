@@ -214,15 +214,9 @@ export function Form9Report({ data }: { data: ReportForm9Data }) {
       </table>
       </div>
 
-      <div className="mt-8 flex justify-between text-sm hidden print:flex">
-        <div>
-          <p>Уполномоченное лицо ЗАО "Кыргызская Фондовая Биржа"</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
-        <div>
-          <p>Уполномоченное лицо ЗАО "Центральный"</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
+      <div className="mt-8 text-sm hidden print:block">
+        <p>Уполномоченное лицо ЗАО "Кыргызская Фондовая Биржа"</p>
+        <p className="mt-8">___________________________ м.п</p>
       </div>
     </div>
   );

@@ -58,19 +58,54 @@
   }
 }
 
-/* Print styles */
+/* Печать: отступы страницы (без колонтитулов приложения) */
+@page {
+  size: A4;
+  margin: 12mm 8mm 10mm 18mm;
+}
+
+/* Альбомная ориентация — «Отчеты по системной информации» */
+@page system-info {
+  size: A4 landscape;
+  margin: 10mm 12mm 10mm 18mm;
+}
+
 @media print {
   html,
   body,
   #root {
     margin: 0 !important;
-    padding: 0 !important;
     height: auto !important;
+  }
+
+  body {
+    padding: 0 !important;
+    background: white !important;
+    color: #000 !important;
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Весь текст чёрный — серый после печати почти не виден */
+  *,
+  *::before,
+  *::after {
+    color: #000 !important;
   }
 
   /* Не тянуть layout на высоту экрана при печати */
   .min-h-screen {
     min-height: auto !important;
+  }
+
+  /* Только layout-оболочка, не flex-1 внутри отчётов (линии подписи) */
+  main.flex-1 {
+    flex: none !important;
+  }
+
+  /* Линии подписи — явно чёрные при печати */
+  .border-b {
+    border-bottom-color: #000 !important;
   }
 
   /* Hide header, navigation, buttons */
@@ -81,45 +116,119 @@
     display: none !important;
   }
   
-  /* Show only report content */
-  body {
-    background: white !important;
-    font-size: 8pt !important;
-  }
-  
   main {
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
   }
-  
+
+  main > div {
+    max-width: 100% !important;
+  }
+
+  /* Card без лишних полей при печати */
+  .p-6 {
+    padding: 0 !important;
+  }
+  .pt-0 {
+    padding-top: 0 !important;
+  }
+
+  .text-lg {
+    font-size: 10pt !important;
+  }
+  .leading-relaxed {
+    line-height: 1.2 !important;
+  }
+  .leading-normal {
+    line-height: 1.2 !important;
+  }
+
+  /* Компактные отступы отчётов при печати */
+  .mb-6 {
+    margin-bottom: 2.5mm !important;
+  }
+  .mb-4 {
+    margin-bottom: 1.5mm !important;
+  }
+  .mt-3 {
+    margin-top: 1mm !important;
+  }
+  .mt-4 {
+    margin-top: 1.5mm !important;
+  }
+  .mt-6 {
+    margin-top: 2.5mm !important;
+  }
+  .mt-8 {
+    margin-top: 3mm !important;
+  }
+  .mt-10 {
+    margin-top: 4mm !important;
+  }
+  .pt-8 {
+    padding-top: 3mm !important;
+  }
+  .pb-6 {
+    padding-bottom: 0 !important;
+  }
+  .gap-4 {
+    gap: 2mm !important;
+  }
+
+  /* Шапка отчёта: логотип */
+  img.h-14,
+  img.h-16 {
+    height: 12mm !important;
+    width: 12mm !important;
+    border-radius: 0 !important;
+  }
+
   h1, h2, h3 {
     font-size: 10pt !important;
-    margin: 2mm 0 !important;
+    margin: 1mm 0 !important;
+    line-height: 1.2 !important;
+  }
+
+  .text-base {
+    font-size: 9pt !important;
+  }
+  .text-sm {
+    font-size: 8pt !important;
+  }
+  .text-xs {
+    font-size: 8pt !important;
   }
   
   table {
     width: 100% !important;
-    font-size: 7pt !important;
+    font-size: 8pt !important;
     border-collapse: collapse !important;
+    line-height: 1.2 !important;
   }
   
   table th {
-    font-size: 7pt !important;
-    padding: 1mm 2mm !important;
+    font-size: 8pt !important;
+    padding: 0.8mm 1.5mm !important;
     background-color: #f0f0f0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
   
   table td {
-    font-size: 7pt !important;
-    padding: 1mm 2mm !important;
+    font-size: 8pt !important;
+    padding: 0.8mm 1.5mm !important;
   }
   
   .bg-muted,
   .bg-primary\/10 {
     background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bg-emerald-50 {
+    background-color: #ecfdf5 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -130,5 +239,128 @@
   
   thead {
     display: table-header-group;
+  }
+
+  /* Контракт / свидетельство: ровно 1 сделка = 1 лист (2 копии на всю высоту) */
+  .mt-6:has(.print-duplex-sheet),
+  .mt-10:has(.print-duplex-sheet) {
+    margin: 0 !important;
+  }
+
+  .print-duplex-sheet {
+    box-sizing: border-box;
+    /* Чуть меньше области страницы — иначе хвост даёт пустой лист */
+    height: 268mm;
+    max-height: 268mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: auto;
+    page-break-after: auto;
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .print-duplex-sep {
+    flex: 0 0 auto;
+    margin: 5mm 0 !important;
+    padding: 0 !important;
+    border-top: 1.5px dashed #666;
+  }
+
+  .print-duplex-sheet .print-duplex-sep.mt-10,
+  .print-duplex-sheet .print-duplex-sep.pt-8 {
+    margin: 5mm 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-duplex-copy {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-duplex-head,
+  .print-duplex-foot {
+    flex: 0 0 auto;
+  }
+
+  .print-duplex-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+
+  .print-duplex-sheet .print-gap {
+    flex: 1 1 0;
+    min-height: 0.8mm;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-duplex-sheet .text-sm {
+    font-size: 8pt !important;
+  }
+
+  .print-duplex-sheet .text-lg,
+  .print-duplex-sheet h1 {
+    font-size: 10pt !important;
+    margin: 0.5mm 0 1mm !important;
+  }
+
+  .print-duplex-sheet img.h-14,
+  .print-duplex-sheet img.h-16 {
+    height: 12mm !important;
+    width: 12mm !important;
+  }
+
+  .print-duplex-sheet .mb-6,
+  .print-duplex-sheet .mb-4,
+  .print-duplex-sheet .mb-2,
+  .print-duplex-sheet .mb-1,
+  .print-duplex-sheet .mt-3,
+  .print-duplex-sheet .mt-4,
+  .print-duplex-sheet .my-3 {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .print-duplex-sheet .mt-10:not(.print-duplex-sep),
+  .print-duplex-sheet .pt-8:not(.print-duplex-sep) {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .print-duplex-sheet .leading-relaxed,
+  .print-duplex-sheet .leading-normal {
+    line-height: 1.2 !important;
+  }
+
+  .print-duplex-sheet .py-\[1px\] {
+    padding-top: 0.2mm !important;
+    padding-bottom: 0.2mm !important;
+  }
+
+  /* Отчеты по системной информации: только альбом (шрифты — общие, как у контракта) */
+  body.print-system-info img.h-14,
+  body.print-system-info img.h-16 {
+    height: 12mm !important;
+    width: 12mm !important;
+    border-radius: 0 !important;
   }
 }

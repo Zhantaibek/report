@@ -30,7 +30,8 @@ import Form3Report, {
   type ReportTradesForm3Data,
   type ParticipantGroup,
 } from '../components/reports/Form3Report.tsx';
-import { Form6AReport, type ReportForm6AData, type ClassData, type SecurityData, type TradeData } from '../components/reports/Form6AReport.tsx';
+import { Form6AReport, type ClassData, type SecurityData, type TradeData } from '../components/reports/Form6AReport.tsx';
+import { Form6BReport } from '../components/reports/Form6BReport.tsx';
 import { Form9Report, type ReportForm9Data } from '../components/reports/Form9Report.tsx';
 import { AuctionSummaryReport, type AuctionSummaryData } from '../components/reports/AuctionSummaryReport.tsx';
 import { AuctionSummary2Report, type AuctionSummary2Row } from '../components/reports/AuctionSummary2Report.tsx';
@@ -43,6 +44,12 @@ import { Form5Report, type ReportForm5Data, type Form5Row } from '../components/
 import { Form6Report, type ReportForm6Data, type Form6Row } from '../components/reports/Form6Report.tsx';
 import { Form8Report, type ReportForm8Data, type Form8Row } from '../components/reports/Form8Report.tsx';
 import { Form7Report, type ReportForm7Data, type Form7Row } from '../components/reports/Form7Report.tsx';
+import { Form14Report, type Form14Row } from '../components/reports/Form14Report.tsx';
+import { Form15Report, type Form15Row } from '../components/reports/Form15Report.tsx';
+import { Form13Report, type Form13Summary } from '../components/reports/Form13Report.tsx';
+import { Form06Report, buildForm06Data } from '../components/reports/Form06Report.tsx';
+import { OrdersSummaryReport, buildOrdersSummaryData } from '../components/reports/OrdersSummaryReport.tsx';
+import { TradesBySecReport, buildTradesBySecData } from '../components/reports/TradesBySecReport.tsx';
 import {
   StateHoldingForm5Top5Report,
   buildStateHoldingForm5Top5Data,
@@ -109,9 +116,16 @@ const FORM_META: Record<string, FormMeta> = {
   Blank_Form_5:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_6:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_6A:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_6B:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_06:  { customView: true, dataSource: 'quik', filterMode: 'none' },
   Blank_Form_7:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_8:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_9:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_13:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_14:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_15:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Orders_Summary: { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Trades_By_Sec:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_USD: { customView: true, dataSource: 'usd',  filterMode: 'oracle' },
 
   // ── Аукцион ───────────────────────────────────────────────────────────────
@@ -120,6 +134,8 @@ const FORM_META: Record<string, FormMeta> = {
   Auction_Bid_Classification:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Auction_Central_Depository:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Auction_Additional_Placement: { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Auction_Exchange_Contract:    { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Auction_Exchange_Certificate: { customView: true, dataSource: 'quik', filterMode: 'quik' },
 
   // ── Юридические документы ─────────────────────────────────────────────────
   Exchange_Contract:     { customView: true, dataSource: 'quik', filterMode: 'quik' },
@@ -135,6 +151,9 @@ const FORM_META: Record<string, FormMeta> = {
   StateHolding_Form9:      { customView: true, dataSource: 'quik', filterMode: 'none' },
   StateHolding_Form10:     { customView: true, dataSource: 'quik', filterMode: 'none' },
 };
+
+/** Подсветка селекта, когда выбрано конкретное значение (не «все»). */
+const FILTER_ACTIVE_TRIGGER = 'border-emerald-300 bg-emerald-50';
 
 /** Все формы с собственным шаблоном (не generic-таблица); для них доступна печать. */
 const FORMS_WITH_CUSTOM_VIEW = new Set(Object.keys(FORM_META));
@@ -524,10 +543,26 @@ export default function Reports() {
 
   const handlePrint = () => {
     setIsPrinting(true);
-    setTimeout(() => {
-      window.print();
+    const prevTitle = document.title;
+    document.title = ' ';
+    const isSystemInfo = selectedForm?.category === 'Отчеты по системной информации';
+    let landscapeStyle: HTMLStyleElement | null = null;
+    if (isSystemInfo) {
+      document.body.classList.add('print-system-info');
+      landscapeStyle = document.createElement('style');
+      landscapeStyle.setAttribute('data-print-landscape', '1');
+      landscapeStyle.textContent = '@page { size: A4 landscape; margin: 10mm 12mm 10mm 18mm; }';
+      document.head.appendChild(landscapeStyle);
+    }
+    const restore = () => {
+      document.title = prevTitle;
+      document.body.classList.remove('print-system-info');
+      landscapeStyle?.remove();
       setIsPrinting(false);
-    }, 100);
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    setTimeout(() => window.print(), 100);
   };
 
   const handleReset = () => {
@@ -599,6 +634,47 @@ export default function Reports() {
     if (code === 'Blank_Form_1' && groupedResult)
       return { totalRecords: groupedResult.total, totalPages: groupedResult.totalPages };
 
+    // Форма 06 / Form5 Top5 — одна страница (топ-5 участников)
+    if (code === 'Blank_Form_06' || code === 'StateHolding_Form5_Top5') {
+      return { totalRecords: 1, totalPages: 1 };
+    }
+
+    // Форма 13 — одна сводная страница
+    if (code === 'Blank_Form_13') {
+      return { totalRecords: 1, totalPages: 1 };
+    }
+
+    // Форма 14 — пагинация по участникам (покупатель + продавец)
+    if (code === 'Blank_Form_14') {
+      const names = new Set<string>();
+      for (const r of rows) {
+        const buyer = String(r.buyerName ?? '').trim();
+        const seller = String(r.sellerName ?? '').trim();
+        if (buyer) names.add(buyer);
+        if (seller) names.add(seller);
+      }
+      const n = names.size;
+      return { totalRecords: n, totalPages: Math.ceil(n / limit) || 0 };
+    }
+
+    // Форма 15 — пагинация по агрегированным ЦБ
+    if (code === 'Blank_Form_15') {
+      const secCount = new Set(rows.map((r) => String(r.secCode ?? r.secFullName ?? ''))).size;
+      return { totalRecords: secCount, totalPages: Math.ceil(secCount / limit) || 0 };
+    }
+
+    // Сводная ведомость заявок — пагинация по ЦБ
+    if (code === 'Orders_Summary') {
+      const secCount = new Set(rows.map((r) => String(r.secCode ?? r.secFullName ?? ''))).size;
+      return { totalRecords: secCount, totalPages: Math.ceil(secCount / limit) || 0 };
+    }
+
+    // Отчет о сделках по ЦБ — пагинация по инструментам
+    if (code === 'Trades_By_Sec') {
+      const secCount = new Set(rows.map((r) => String(r.secCode ?? r.isinCode ?? ''))).size;
+      return { totalRecords: secCount, totalPages: Math.ceil(secCount / limit) || 0 };
+    }
+
     // Формы с уникальной группировкой: 1 группа = 1 страница
     if (code === 'Auction_Summary')
       return onePerPage(new Set(rows.map((r) => String(r.secCode ?? ''))).size);
@@ -608,7 +684,13 @@ export default function Reports() {
       return onePerPage(new Set(rows.map((r) => `${r.sec_code ?? ''}\t${r.trade_date ?? ''}`)).size);
 
     // Формы с 1 документом/записью на страницу
-    if (code === 'Auction_Summary_2' || code === 'Exchange_Contract' || code === 'Exchange_Certificate')
+    if (
+      code === 'Auction_Summary_2'
+      || code === 'Exchange_Contract'
+      || code === 'Exchange_Certificate'
+      || code === 'Auction_Exchange_Contract'
+      || code === 'Auction_Exchange_Certificate'
+    )
       return onePerPage(rows.length);
 
     // Стандартная пагинация
@@ -687,13 +769,16 @@ export default function Reports() {
       );
     }
 
-    // ── Blank_Form_6A ───────────────────────────────────────────────────────
-    if (code === 'Blank_Form_6A') {
+    // ── Blank_Form_6A / Blank_Form_6B ───────────────────────────────────────
+    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B') {
       if (!tableRows?.length) return null;
       const { pagedRows } = getPagedRows(tableRows);
+      const reportData = { periodFrom: dateFrom, periodTo: dateTo, classes: groupByClassSecAndDate(pagedRows) };
       return (
-        <div className="mt-6" key={`form6a-${page}`}>
-          <Form6AReport data={{ periodFrom: dateFrom, periodTo: dateTo, classes: groupByClassSecAndDate(pagedRows) }} />
+        <div className="mt-6" key={`${code.toLowerCase()}-${page}`}>
+          {code === 'Blank_Form_6B'
+            ? <Form6BReport data={reportData} />
+            : <Form6AReport data={reportData} />}
         </div>
       );
     }
@@ -729,6 +814,94 @@ export default function Reports() {
               totalSummary: (isPrinting || page === totalPages) ? { totalQuantity, totalValue, totalTrades, totalSecurities } : undefined,
             }}
           />
+        </div>
+      );
+    }
+
+    // ── Blank_Form_06 ───────────────────────────────────────────────────────
+    if (code === 'Blank_Form_06') {
+      if (!tableRows?.length) return null;
+      return (
+        <div className="mt-6" key="form06">
+          <Form06Report data={buildForm06Data(tableRows, dateFrom, dateTo)} />
+        </div>
+      );
+    }
+
+    // ── Blank_Form_13 ───────────────────────────────────────────────────────
+    if (code === 'Blank_Form_13') {
+      if (!tableRows?.length) return null;
+      return (
+        <div className="mt-6" key="form13">
+          <Form13Report
+            data={{
+              periodFrom: dateFrom,
+              periodTo: dateTo,
+              summary: buildForm13Summary(tableRows),
+            }}
+          />
+        </div>
+      );
+    }
+
+    // ── Blank_Form_14 ───────────────────────────────────────────────────────
+    if (code === 'Blank_Form_14') {
+      if (!tableRows?.length) return null;
+      const allRows = buildForm14Rows(tableRows);
+      const { pagedRows, totalPages } = paginate(allRows, page, limit, isPrinting);
+      return (
+        <div className="mt-6" key={`form14-${page}`}>
+          <Form14Report
+            data={{
+              periodFrom: dateFrom,
+              periodTo: dateTo,
+              rows: pagedRows,
+              totals: (isPrinting || page === totalPages) ? buildForm14Totals(allRows) : undefined,
+            }}
+          />
+        </div>
+      );
+    }
+
+    // ── Blank_Form_15 ───────────────────────────────────────────────────────
+    if (code === 'Blank_Form_15') {
+      if (!tableRows?.length) return null;
+      const allRows = buildForm15Rows(tableRows);
+      const { pagedRows, totalPages } = paginate(allRows, page, limit, isPrinting);
+      return (
+        <div className="mt-6" key={`form15-${page}`}>
+          <Form15Report
+            data={{
+              periodFrom: dateFrom,
+              periodTo: dateTo,
+              rows: pagedRows,
+              totals: (isPrinting || page === totalPages) ? buildForm15Totals(allRows) : undefined,
+            }}
+          />
+        </div>
+      );
+    }
+
+    // ── Orders_Summary ──────────────────────────────────────────────────────
+    if (code === 'Orders_Summary') {
+      if (!tableRows?.length) return null;
+      const all = buildOrdersSummaryData(tableRows, dateFrom, dateTo);
+      const { pagedRows } = paginate(all.securities, page, limit, isPrinting);
+      return (
+        <div className="mt-6" key={`orders-summary-${page}`}>
+          <OrdersSummaryReport data={{ ...all, securities: pagedRows }} />
+        </div>
+      );
+    }
+
+    // ── Trades_By_Sec ───────────────────────────────────────────────────────
+    if (code === 'Trades_By_Sec') {
+      if (!tableRows?.length) return null;
+      const all = buildTradesBySecData(tableRows, dateFrom, dateTo);
+      const { pagedRows } = paginate(all.groups, page, limit, isPrinting);
+      return (
+        <div className="mt-6" key={`trades-by-sec-${page}`}>
+          <TradesBySecReport data={{ ...all, groups: pagedRows }} />
         </div>
       );
     }
@@ -834,9 +1007,11 @@ export default function Reports() {
               auctionDate: dateFrom,
               secCode: String(first?.secCode ?? ''),
               classCode: String(first?.classCode ?? ''),
+              className: first?.className != null ? String(first.className) : undefined,
               secFullName: String(first?.secFullName ?? ''),
               registrationNumber: String(first?.secCode ?? ''),
               couponRate: Number(first?.yieldPercent ?? 0),
+              participantCount: Number(first?.participantCount ?? 0),
               bids: [],
               summary: {
                 competitiveQty, competitiveNominal, competitiveValueActual, competitivePercent: (competitiveNominal / totalVolume) * 100,
@@ -967,9 +1142,16 @@ export default function Reports() {
       );
     }
 
-    // ── Exchange_Contract / Exchange_Certificate (общий маппинг строк) ──────
-    if (code === 'Exchange_Contract' || code === 'Exchange_Certificate') {
+    // ── Exchange_Contract / Exchange_Certificate (+ аукционные копии) ──────
+    if (
+      code === 'Exchange_Contract'
+      || code === 'Exchange_Certificate'
+      || code === 'Auction_Exchange_Contract'
+      || code === 'Auction_Exchange_Certificate'
+    ) {
       if (!tableRows?.length) return null;
+      const showDealNumber =
+        code === 'Auction_Exchange_Contract' || code === 'Auction_Exchange_Certificate';
       const start = isPrinting ? 0 : (page - 1);
       const end   = isPrinting ? tableRows.length : start + 1;
       return (
@@ -998,16 +1180,19 @@ export default function Reports() {
               buyerCommission: row.buyerCommission != null ? Number(row.buyerCommission) : null,
             };
             const cls = idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page';
-            if (code === 'Exchange_Contract') {
+            if (code === 'Exchange_Contract' || code === 'Auction_Exchange_Contract') {
               return (
                 <div key={`exchange-contract-${row.id ?? idx}-${page}`} className={cls}>
-                  <ExchangeContractReport data={base as ExchangeContractData} />
+                  <ExchangeContractReport data={base as ExchangeContractData} showDealNumber={showDealNumber} />
                 </div>
               );
             }
             return (
               <div key={`exchange-cert-${row.id ?? idx}-${page}`} className={cls}>
-                <ExchangeCertificateReport data={{ ...base, yield: row.yield != null ? Number(row.yield) : null } as ExchangeCertificateData} />
+                <ExchangeCertificateReport
+                  data={{ ...base, yield: row.yield != null ? Number(row.yield) : null } as ExchangeCertificateData}
+                  showDealNumber={showDealNumber}
+                />
               </div>
             );
           })}
@@ -1129,6 +1314,7 @@ export default function Reports() {
                   placeholder="— выбрать —"
                   dropdownWidth="wide"
                   searchFields={['label']}
+                  triggerClassName={selectedFormId ? FILTER_ACTIVE_TRIGGER : undefined}
                   groups={reportFormSelectGroups.map(([category, categoryForms]): SelectOptionGroup => ({
                     label: category,
                     icon: category === 'Отчеты по Аукциону'
@@ -1136,10 +1322,15 @@ export default function Reports() {
                       : category === 'Отчеты ГосФинНадзор'
                         ? <Building2 className="mr-2 h-4 w-4 shrink-0 opacity-70" />
                         : <FileText className="mr-2 h-4 w-4 shrink-0 opacity-70" />,
-                    options: categoryForms.map((form) => ({
-                      value: String(form.id),
-                      label: (form.description || form.name || '').trim(),
-                    })),
+                    options: categoryForms.map((form) => {
+                      const isOracle = FORM_META[form.code]?.dataSource === 'usd'
+                        || FORM_META[form.code]?.dataSource === 'gold';
+                      return {
+                        value: String(form.id),
+                        label: (form.description || form.name || '').trim(),
+                        className: isOracle ? 'bg-amber-50 hover:bg-amber-100' : undefined,
+                      };
+                    }),
                   }))}
                 />
               </div>
@@ -1156,6 +1347,7 @@ export default function Reports() {
                     placeholder={loadingInstruments ? 'Загрузка…' : '— все инструменты —'}
                     loading={loadingInstruments}
                     searchFields={['label', 'value']}
+                    triggerClassName={selectedOwnId !== undefined ? FILTER_ACTIVE_TRIGGER : undefined}
                     options={[
                       { value: '0', label: '— все инструменты —' },
                       ...oracleInstruments.map((i) => ({
@@ -1182,6 +1374,7 @@ export default function Reports() {
                     disabled={!selectedFormId}
                     placeholder="— все классы —"
                     searchFields={['label', 'value']}
+                    triggerClassName={filters.classCode ? FILTER_ACTIVE_TRIGGER : undefined}
                     options={[
                       { value: '0', label: '— все классы —' },
                       ...classes.map((c) => ({
@@ -1205,6 +1398,7 @@ export default function Reports() {
                     disabled={!selectedFormId}
                     placeholder="— все участники —"
                     searchFields={['label', 'value']}
+                    triggerClassName={filters.firmCode ? FILTER_ACTIVE_TRIGGER : undefined}
                     options={[
                       { value: '0', label: '— все участники —' },
                       ...firms.map((f) => ({
@@ -1229,6 +1423,7 @@ export default function Reports() {
                       disabled={!selectedFormId}
                       placeholder="— все инструменты —"
                       searchFields={['label', 'value']}
+                      triggerClassName={filters.instrument ? FILTER_ACTIVE_TRIGGER : undefined}
                       options={[
                         { value: '0', label: '— все инструменты —' },
                         ...securities
@@ -1253,6 +1448,7 @@ export default function Reports() {
                       disabled={!selectedFormId}
                       placeholder="— все участники —"
                       searchFields={['label', 'value']}
+                      triggerClassName={filters.firmCode ? FILTER_ACTIVE_TRIGGER : undefined}
                       options={[
                         { value: '0', label: '— все участники —' },
                         ...firms.map((f) => ({
@@ -1281,7 +1477,9 @@ export default function Reports() {
                       onChange={(date) => setFilters({ ...filters, dateFrom: date, dateTo: date })}
                       disabled={!selectedFormId}
                       required
-                      className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
+                      className={`block h-10 px-3 rounded-md border text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40 ${
+                        filters.dateFrom ? FILTER_ACTIVE_TRIGGER : 'border-input bg-background'
+                      }`}
                     />
                   </div>
                 ) : (
@@ -1295,7 +1493,9 @@ export default function Reports() {
                         onChange={(date) => setFilters({ ...filters, dateFrom: date })}
                         disabled={!selectedFormId}
                         required
-                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
+                        className={`block h-10 px-3 rounded-md border text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40 ${
+                          filters.dateFrom ? FILTER_ACTIVE_TRIGGER : 'border-input bg-background'
+                        }`}
                       />
                     </div>
                     <span className="text-muted-foreground self-end mb-2.5">—</span>
@@ -1308,7 +1508,9 @@ export default function Reports() {
                         onChange={(date) => setFilters({ ...filters, dateTo: date })}
                         disabled={!selectedFormId}
                         required
-                        className="block h-10 px-3 rounded-md border border-input bg-background text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40"
+                        className={`block h-10 px-3 rounded-md border text-sm disabled:opacity-50 disabled:cursor-not-allowed w-40 ${
+                          filters.dateTo ? FILTER_ACTIVE_TRIGGER : 'border-input bg-background'
+                        }`}
                       />
                     </div>
                   </>
@@ -1819,6 +2021,269 @@ function buildForm5Data(
     totalQuantity: totals.totalQuantity,
     totalVolume: totals.totalVolume,
     dealCount: totals.dealCount,
+  };
+}
+
+/**
+ * Форма 13: сводка комиссионных сборов за период.
+ * Рыночные = secondary, Регистрационные = primary.
+ * Комиссия — sellerCommission + buyerCommission из report-engine.
+ */
+function buildForm13Summary(rows: Record<string, unknown>[]): Form13Summary {
+  let volume = 0;
+  let commission = 0;
+  let dealCount = 0;
+  let marketDealCount = 0;
+  let marketCommission = 0;
+  let registrationDealCount = 0;
+  let registrationCommission = 0;
+  const participants = new Set<string>();
+
+  for (const r of rows) {
+    const tradeVolume = Number(r.value ?? 0);
+    const tradeCommission = Number(r.sellerCommission ?? 0) + Number(r.buyerCommission ?? 0);
+    const marketType = String(r.marketType ?? '');
+    const isRegistration = marketType === 'primary';
+
+    volume += tradeVolume;
+    commission += tradeCommission;
+    dealCount += 1;
+
+    const buyer = String(r.buyerName ?? '').trim();
+    const seller = String(r.sellerName ?? '').trim();
+    if (buyer) participants.add(buyer);
+    if (seller) participants.add(seller);
+
+    if (isRegistration) {
+      registrationDealCount += 1;
+      registrationCommission += tradeCommission;
+    } else {
+      marketDealCount += 1;
+      marketCommission += tradeCommission;
+    }
+  }
+
+  return {
+    volume,
+    commission,
+    actualRatePercent: volume > 0 ? (commission / volume) * 100 : 0,
+    participantCount: participants.size,
+    dealCount,
+    avgCommission: dealCount > 0 ? commission / dealCount : 0,
+    marketDealCount,
+    marketCommission,
+    registrationDealCount,
+    registrationCommission,
+  };
+}
+
+/**
+ * Форма 14: агрегация по участнику (покупатель / продавец отдельно).
+ * Комиссия стороны — buyerCommission / sellerCommission по тарифу ЦБ.
+ */
+function buildForm14Rows(rows: Record<string, unknown>[]): Form14Row[] {
+  type Acc = {
+    participantName: string;
+    volume: number;
+    commission: number;
+    dealCount: number;
+    marketDealCount: number;
+    marketCommission: number;
+    registrationDealCount: number;
+    registrationCommission: number;
+  };
+  const byParticipant = new Map<string, Acc>();
+
+  const addSide = (name: string, volume: number, commission: number, isRegistration: boolean) => {
+    const key = name.trim() || '—';
+    let acc = byParticipant.get(key);
+    if (!acc) {
+      acc = {
+        participantName: key,
+        volume: 0,
+        commission: 0,
+        dealCount: 0,
+        marketDealCount: 0,
+        marketCommission: 0,
+        registrationDealCount: 0,
+        registrationCommission: 0,
+      };
+      byParticipant.set(key, acc);
+    }
+    acc.volume += volume;
+    acc.commission += commission;
+    acc.dealCount += 1;
+    if (isRegistration) {
+      acc.registrationDealCount += 1;
+      acc.registrationCommission += commission;
+    } else {
+      acc.marketDealCount += 1;
+      acc.marketCommission += commission;
+    }
+  };
+
+  for (const r of rows) {
+    const volume = Number(r.value ?? 0);
+    const marketType = String(r.marketType ?? '');
+    const isRegistration = marketType === 'primary';
+    const buyerName = String(r.buyerName ?? '').trim();
+    const sellerName = String(r.sellerName ?? '').trim();
+    addSide(buyerName, volume, Number(r.buyerCommission ?? 0), isRegistration);
+    addSide(sellerName, volume, Number(r.sellerCommission ?? 0), isRegistration);
+  }
+
+  const totalCommission = Array.from(byParticipant.values()).reduce((s, a) => s + a.commission, 0) || 1;
+
+  return Array.from(byParticipant.values())
+    .map((a) => ({
+      participantName: a.participantName,
+      volume: a.volume,
+      commission: a.commission,
+      actualRatePercent: a.volume > 0 ? (a.commission / a.volume) * 100 : 0,
+      dealCount: a.dealCount,
+      avgCommission: a.dealCount > 0 ? a.commission / a.dealCount : 0,
+      marketDealCount: a.marketDealCount,
+      marketCommission: a.marketCommission,
+      registrationDealCount: a.registrationDealCount,
+      registrationCommission: a.registrationCommission,
+      sharePercent: (a.commission / totalCommission) * 100,
+    }))
+    .sort((a, b) => a.participantName.localeCompare(b.participantName, 'ru'));
+}
+
+function buildForm14Totals(rows: Form14Row[]): Form14Row {
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.volume += r.volume;
+      acc.commission += r.commission;
+      acc.dealCount += r.dealCount;
+      acc.marketDealCount += r.marketDealCount;
+      acc.marketCommission += r.marketCommission;
+      acc.registrationDealCount += r.registrationDealCount;
+      acc.registrationCommission += r.registrationCommission;
+      return acc;
+    },
+    {
+      participantName: 'Итого',
+      volume: 0,
+      commission: 0,
+      dealCount: 0,
+      marketDealCount: 0,
+      marketCommission: 0,
+      registrationDealCount: 0,
+      registrationCommission: 0,
+    },
+  );
+  return {
+    ...totals,
+    actualRatePercent: totals.volume > 0 ? (totals.commission / totals.volume) * 100 : 0,
+    avgCommission: totals.dealCount > 0 ? totals.commission / totals.dealCount : 0,
+    sharePercent: 100,
+  };
+}
+
+/**
+ * Форма 15: агрегация по ЦБ.
+ * Рыночные = secondary (вторичка), Регистрационные = primary (первичка).
+ * Комиссия — из тарифов ЦБ (sellerCommission + buyerCommission из report-engine).
+ */
+function buildForm15Rows(rows: Record<string, unknown>[]): Form15Row[] {
+  type Acc = {
+    secName: string;
+    volume: number;
+    commission: number;
+    dealCount: number;
+    marketDealCount: number;
+    marketCommission: number;
+    registrationDealCount: number;
+    registrationCommission: number;
+  };
+  const bySec = new Map<string, Acc>();
+
+  for (const r of rows) {
+    const secCode = String(r.secCode ?? '');
+    const secFullName = String(r.secFullName ?? '').trim();
+    const key = secCode || secFullName || '—';
+    const volume = Number(r.value ?? 0);
+    // Комиссия по тарифу класса ЦБ (commission_tariffs)
+    const commission = Number(r.sellerCommission ?? 0) + Number(r.buyerCommission ?? 0);
+    const marketType = String(r.marketType ?? '');
+    const isRegistration = marketType === 'primary'; // первичка
+    const isMarket = marketType === 'secondary' || !isRegistration; // вторичка
+
+    let acc = bySec.get(key);
+    if (!acc) {
+      acc = {
+        secName: secFullName || secCode || '—',
+        volume: 0,
+        commission: 0,
+        dealCount: 0,
+        marketDealCount: 0,
+        marketCommission: 0,
+        registrationDealCount: 0,
+        registrationCommission: 0,
+      };
+      bySec.set(key, acc);
+    }
+    acc.volume += volume;
+    acc.commission += commission;
+    acc.dealCount += 1;
+    if (isRegistration) {
+      acc.registrationDealCount += 1;
+      acc.registrationCommission += commission;
+    } else if (isMarket) {
+      acc.marketDealCount += 1;
+      acc.marketCommission += commission;
+    }
+  }
+
+  const totalCommission = Array.from(bySec.values()).reduce((s, a) => s + a.commission, 0) || 1;
+
+  return Array.from(bySec.values())
+    .map((a) => ({
+      secName: a.secName,
+      volume: a.volume,
+      commission: a.commission,
+      actualRatePercent: a.volume > 0 ? (a.commission / a.volume) * 100 : 0,
+      dealCount: a.dealCount,
+      avgCommission: a.dealCount > 0 ? a.commission / a.dealCount : 0,
+      marketDealCount: a.marketDealCount,
+      marketCommission: a.marketCommission,
+      registrationDealCount: a.registrationDealCount,
+      registrationCommission: a.registrationCommission,
+      sharePercent: (a.commission / totalCommission) * 100,
+    }))
+    .sort((a, b) => a.secName.localeCompare(b.secName, 'ru'));
+}
+
+function buildForm15Totals(rows: Form15Row[]): Form15Row {
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.volume += r.volume;
+      acc.commission += r.commission;
+      acc.dealCount += r.dealCount;
+      acc.marketDealCount += r.marketDealCount;
+      acc.marketCommission += r.marketCommission;
+      acc.registrationDealCount += r.registrationDealCount;
+      acc.registrationCommission += r.registrationCommission;
+      return acc;
+    },
+    {
+      secName: 'Итого',
+      volume: 0,
+      commission: 0,
+      dealCount: 0,
+      marketDealCount: 0,
+      marketCommission: 0,
+      registrationDealCount: 0,
+      registrationCommission: 0,
+    },
+  );
+  return {
+    ...totals,
+    actualRatePercent: totals.volume > 0 ? (totals.commission / totals.volume) * 100 : 0,
+    avgCommission: totals.dealCount > 0 ? totals.commission / totals.dealCount : 0,
+    sharePercent: 100,
   };
 }
 

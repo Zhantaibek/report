@@ -221,12 +221,17 @@ export async function rowsToDocxBuffer(
     ? [buildTotalsRow(keys, computeTotals(rows, sumKeys), sumKeys)]
     : [];
 
-  const table = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [...headerRows, ...dataRows, ...totalsRow],
-  });
+  const body: (Paragraph | Table)[] =
+    rows.length === 0
+      ? [paragraph('Нет данных за указанный период.', { bold: true })]
+      : [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [...headerRows, ...dataRows, ...totalsRow],
+          }),
+        ];
 
-  const children: (Paragraph | Table)[] = meta ? [...buildPrefixParagraphs(meta), table] : [table];
+  const children: (Paragraph | Table)[] = meta ? [...buildPrefixParagraphs(meta), ...body] : body;
 
   const doc = new Document({
     styles: {

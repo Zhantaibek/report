@@ -64,7 +64,7 @@ function Row2({
 }
 
 function Gap() {
-  return <div className="mt-3" />;
+  return <div className="print-gap mt-3" />;
 }
 
 const LEGAL_TEXT =
@@ -74,65 +74,68 @@ function OneGoldContract({ data }: { data: ExchangeContractGoldData }) {
   const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
   const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
   return (
-    <div className="w-full bg-white text-sm leading-normal">
-      <KSELogoHeader />
-
-      <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт №{data.serial ?? '—'} </h1>
-      <p className="text-center text-sm italic mb-1">
-        (в редакции решений Совета директоров ЗАО «КФБ» от 13 марта 2026 года)
-      </p>
-      <p className="text-center text-sm mb-4">
-        <span className="text-foreground">Номер сделки: </span>
-        <span className="font-semibold text-foreground">{data.serial ?? '—'}</span>
-      </p>
-
-      <Row label="Дата заключения сделки" value={fmtDate(data.tradeDate)} />
-
-      <Gap />
-
-      <Row label="Участник торгов (Продавец)" value={data.sellerName || '—'} />
-      <Row label="Счет Продавца" value={data.sellerAccount || '—'} />
-      <Row label="Трейдер Продавца" value={data.sellerTrader || '—'} />
-
-      <Gap />
-
-      <Row label="Участник торгов (Покупатель)" value={data.buyerName || '—'} />
-      <Row label="Счет Покупателя" value={data.buyerAccount || '—'} />
-      <Row label="Трейдер Покупателя" value={data.buyerTrader || '—'} />
-
-      <Gap />
-
-      <Row label="Торговый символ инструмента" value={data.instrumentCode || '—'} />
-      <Row label="Торговый инструмент" value={data.instrumentName || '—'} />
-
-      <Gap />
-
-      <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)}`} />
-      <Row label="Цена торгового инструмента" value={`${fmtNum(data.price, 2)} с.`} />
-      <Row label="Сумма сделки" value={`${fmtNum(data.value, 2)} с.`} />
-      <Row label="Комиссионный сбор с Продавца" value={sellerComm} />
-      <Row label="Комиссионный сбор с Покупателя" value={buyerComm} />
-
-      <Gap />
-
-      <div className="flex mb-4">
-        <div className="w-1/2 flex items-end gap-2">
-          <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
-          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
-        </div>
-        <div className="w-1/2 flex items-end gap-2">
-          <span className="text-sm text-foreground shrink-0">Подпись трейдера Покупателя</span>
-          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
-        </div>
+    <div className="print-duplex-copy w-full bg-white text-sm leading-normal">
+      <div className="print-duplex-head">
+        <KSELogoHeader />
+        <h1 className="text-lg font-bold mb-2 text-center">Биржевой контракт №{data.serial ?? '—'} </h1>
+        <p className="text-center text-sm italic mb-1">
+          (в редакции решений Совета директоров ЗАО «КФБ» от 13 марта 2026 года)
+        </p>
+        <p className="text-center text-sm mb-4">
+          <span className="text-foreground">Номер сделки: </span>
+          <span className="font-semibold text-foreground">{data.serial ?? '—'}</span>
+        </p>
       </div>
 
-      <p className="text-center text-sm leading-relaxed text-foreground font-bold">
-        {LEGAL_TEXT}
-      </p>
+      <div className="print-duplex-body">
+        <Row label="Дата заключения сделки" value={fmtDate(data.tradeDate)} />
 
-      <div className="mt-4 flex items-end gap-2">
-        <span className="text-sm text-foreground shrink-0">Подпись уполномоченного лица ЗАО «Кыргызская Фондовая Биржа»</span>
-        <span className="flex-1 border-b border-foreground mb-0.5" />
+        <Gap />
+
+        <Row label="Участник торгов (Продавец)" value={data.sellerName || '—'} />
+        <Row label="Счет Продавца" value={data.sellerAccount || '—'} />
+        <Row label="Трейдер Продавца" value={data.sellerTrader || '—'} />
+
+        <Gap />
+
+        <Row label="Участник торгов (Покупатель)" value={data.buyerName || '—'} />
+        <Row label="Счет Покупателя" value={data.buyerAccount || '—'} />
+        <Row label="Трейдер Покупателя" value={data.buyerTrader || '—'} />
+
+        <Gap />
+
+        <Row label="Торговый символ инструмента" value={data.instrumentCode || '—'} />
+        <Row label="Торговый инструмент" value={data.instrumentName || '—'} />
+
+        <Gap />
+
+        <Row label="Количество торгового инструмента" value={`${fmtNum(data.quantity, 2)}`} />
+        <Row label="Цена торгового инструмента" value={`${fmtNum(data.price, 2)} с.`} />
+        <Row label="Сумма сделки" value={`${fmtNum(data.value, 2)} с.`} />
+        <Row label="Комиссионный сбор с Продавца" value={sellerComm} />
+        <Row label="Комиссионный сбор с Покупателя" value={buyerComm} />
+      </div>
+
+      <div className="print-duplex-foot">
+        <div className="flex mb-4">
+          <div className="w-1/2 flex items-end gap-2">
+            <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
+            <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
+          </div>
+          <div className="w-1/2 flex items-end gap-2">
+            <span className="text-sm text-foreground shrink-0">Подпись трейдера Покупателя</span>
+            <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
+          </div>
+        </div>
+
+        <p className="text-center text-sm leading-relaxed text-foreground font-bold">
+          {LEGAL_TEXT}
+        </p>
+
+        <div className="mt-4 flex items-end gap-2">
+          <span className="text-sm text-foreground shrink-0">Подпись уполномоченного лица ЗАО «Кыргызская Фондовая Биржа»</span>
+          <span className="flex-1 border-b border-foreground mb-0.5" />
+        </div>
       </div>
     </div>
   );
@@ -186,11 +189,10 @@ export function ExchangeContractGold({
 
         return (
           <div key={`gold-contract-${row.serial}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
-            <div className="w-full pb-6 print:max-w-none print:px-0">
+            <div className="print-duplex-sheet w-full pb-6 print:max-w-none print:px-0 print:pb-0">
               <OneGoldContract data={data} />
-              <div className="mt-10 pt-8 border-t-2 border-dashed border-gray-300">
-                <OneGoldContract data={data} />
-              </div>
+              <div className="print-duplex-sep mt-10 pt-8 border-t-2 border-dashed border-gray-300" aria-hidden />
+              <OneGoldContract data={data} />
             </div>
           </div>
         );

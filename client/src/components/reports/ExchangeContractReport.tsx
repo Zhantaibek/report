@@ -70,15 +70,23 @@ function Row2({
   );
 }
 
-/** Разделитель между блоками. */
+/** Разделитель между блоками (при печати растягивается). */
 function Gap() {
-  return <div className="mt-3" />;
+  return <div className="print-gap mt-3" />;
 }
 
 const LEGAL_TEXT =
   'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи ценных бумаг в ходе биржевых торгов, организованных ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки купли-продажи и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
 
-function OneContract({ data, contractTitle }: { data: ExchangeContractData; contractTitle?: string }) {
+function OneContract({
+  data,
+  contractTitle,
+  showDealNumber,
+}: {
+  data: ExchangeContractData;
+  contractTitle?: string;
+  showDealNumber?: boolean;
+}) {
   const tradeDate = data.tradeDate ?? '';
   const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
   const couponVal = data.couponRate != null && data.couponRate > 0
@@ -88,101 +96,112 @@ function OneContract({ data, contractTitle }: { data: ExchangeContractData; cont
   const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
 
   return (
-    <div className="w-full bg-white text-sm leading-normal">
-      <KSELogoHeader />
-
-      <h1 className="text-lg font-bold mb-2 text-center">{contractTitle ?? 'Биржевой контракт'} №{data.id ?? '—'}</h1>
-      <p className="text-center text-sm mb-4">
-        <span className="text-foreground">Номер сделки: </span>
-        <span className="font-semibold text-foreground">{data.id ?? '—'}</span>
-      </p>
-
-      {/* Блок 1: дата и время */}
-      <Row2
-        label1="Дата заключения сделки"
-        value1={fmtDate(tradeDate)}
-        label2="Время заключения сделки"
-        value2={tradeTime}
-      />
-
-      <Gap />
-
-      {/* Блок 2: Продавец */}
-      <Row label="Участник торгов (Продавец / представитель Продавца)" value={data.sellerName || '—'} />
-      <Row label="Счет списания ценных бумаг" value={data.sellAccount || '—'} />
-      <Row label="Трейдер Участника торгов" value={data.sellerClientCode || '—'} />
-
-      <Gap />
-
-      {/* Блок 3: Покупатель */}
-      <Row label="Участник торгов (Покупатель / представитель Покупателя)" value={data.buyerName || '—'} />
-      <Row label="Счет зачисления ценных бумаг" value={data.buyAccount || '—'} />
-      <Row label="Трейдер Участника торгов" value={data.buyerClientCode || '—'} />
-
-      <Gap />
-
-      {/* Блок 4: ЦБ */}
-      <Row label="Вид ЦБ, эмитент ЦБ" value={data.className || data.classCode || '—'} />
-      <Row label="Торговый символ ценной бумаги" value={data.secFullName || data.secCode || '—'} />
-      <Row label="Ставка купона" value={couponVal} />
-
-      <Gap />
-
-      {/* Блок 5: сделка (3 двойных строки) */}
-      <Row2
-        label1="Количество ЦБ"
-        value1={`${fmtNum(data.quantity, 2)} шт.`}
-        label2="Дата исполнения сделки"
-        value2={fmtDate(data.settleDate)}
-      />
-      <Row2
-        label1="Цена за 1 ЦБ"
-        value1={`${fmtNum(data.price, 2)} с.`}
-        label2="Комиссионный сбор с Продавца"
-        value2={sellerComm}
-      />
-      <Row2
-        label1="Сумма сделки"
-        value1={`${fmtNum(data.value, 2)} с.`}
-        label2="Комиссионный сбор с Покупателя"
-        value2={buyerComm}
-      />
-
-      <Gap />
-
-      {/* Блок 6: подписи трейдеров — 50% / 50% */}
-      <div className="flex mb-4">
-        <div className="w-1/2 flex items-end gap-2">
-          <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
-          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
-        </div>
-        <div className="w-1/2 flex items-end gap-2">
-          <span className="text-sm text-foreground shrink-0">Подпись трейдера Покупателя</span>
-          <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
-        </div>
+    <div className="print-duplex-copy w-full bg-white text-sm leading-normal">
+      <div className="print-duplex-head">
+        <KSELogoHeader />
+        <h1 className={`text-lg font-bold text-center ${showDealNumber ? 'mb-2' : 'mb-4'}`}>
+          {contractTitle ?? 'Биржевой контракт'} №{data.id ?? '—'}
+        </h1>
+        {showDealNumber && (
+          <>
+            <p className="text-center text-sm my-3">
+              В ходе аукциона по первичному размещению ГЦБ, проводимого ЗАО «Кыргызская Фондовая Биржа», заключил следующую сделку:
+            </p>
+            <p className="text-center text-sm mb-4">
+              <span className="text-foreground">Номер сделки: </span>
+              <span className="font-semibold text-foreground">{data.id ?? '—'}</span>
+            </p>
+          </>
+        )}
       </div>
 
-      {/* Юридический текст — по центру */}
-      <p className="text-center text-sm leading-relaxed text-foreground font-bold">
-        {LEGAL_TEXT}
-      </p>
+      <div className="print-duplex-body">
+        <Row2
+          label1="Дата заключения сделки"
+          value1={fmtDate(tradeDate)}
+          label2="Время заключения сделки"
+          value2={tradeTime}
+        />
 
-      {/* Подпись биржи */}
-      <div className="mt-4 flex items-end gap-2">
-        <span className="text-sm text-foreground shrink-0">Подпись уполномоченного лица ЗАО «Кыргызская Фондовая Биржа»</span>
-        <span className="flex-1 border-b border-foreground mb-0.5" />
+        <Gap />
+
+        <Row label="Участник торгов (Продавец / представитель Продавца)" value={data.sellerName || '—'} />
+        <Row label="Счет списания ценных бумаг" value={data.sellAccount || '—'} />
+        <Row label="Трейдер Участника торгов" value={data.sellerClientCode || '—'} />
+
+        <Gap />
+
+        <Row label="Участник торгов (Покупатель / представитель Покупателя)" value={data.buyerName || '—'} />
+        <Row label="Счет зачисления ценных бумаг" value={data.buyAccount || '—'} />
+        <Row label="Трейдер Участника торгов" value={data.buyerClientCode || '—'} />
+
+        <Gap />
+
+        <Row label="Вид ЦБ, эмитент ЦБ" value={data.className || data.classCode || '—'} />
+        <Row label="Торговый символ ценной бумаги" value={data.secFullName || data.secCode || '—'} />
+        <Row label="Ставка купона" value={couponVal} />
+
+        <Gap />
+
+        <Row2
+          label1="Количество ЦБ"
+          value1={`${fmtNum(data.quantity, 2)} шт.`}
+          label2="Дата исполнения сделки"
+          value2={fmtDate(data.settleDate)}
+        />
+        <Row2
+          label1="Цена за 1 ЦБ"
+          value1={`${fmtNum(data.price, 2)} с.`}
+          label2="Комиссионный сбор с Продавца"
+          value2={sellerComm}
+        />
+        <Row2
+          label1="Сумма сделки"
+          value1={`${fmtNum(data.value, 2)} с.`}
+          label2="Комиссионный сбор с Покупателя"
+          value2={buyerComm}
+        />
+      </div>
+
+      <div className="print-duplex-foot">
+        <div className="flex mb-4">
+          <div className="w-1/2 flex items-end gap-2">
+            <span className="text-sm text-foreground shrink-0">Подпись трейдера Продавца</span>
+            <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
+          </div>
+          <div className="w-1/2 flex items-end gap-2">
+            <span className="text-sm text-foreground shrink-0">Подпись трейдера Покупателя</span>
+            <span className="flex-1 border-b border-foreground mb-0.5 min-w-0" />
+          </div>
+        </div>
+
+        <p className="text-center text-sm leading-relaxed text-foreground font-bold">
+          {LEGAL_TEXT}
+        </p>
+
+        <div className="mt-4 flex items-end gap-2">
+          <span className="text-sm text-foreground shrink-0">Подпись уполномоченного лица ЗАО «Кыргызская Фондовая Биржа»</span>
+          <span className="flex-1 border-b border-foreground mb-0.5" />
+        </div>
       </div>
     </div>
   );
 }
 
-export function ExchangeContractReport({ data, contractTitle }: { data: ExchangeContractData; contractTitle?: string }) {
+export function ExchangeContractReport({
+  data,
+  contractTitle,
+  showDealNumber = false,
+}: {
+  data: ExchangeContractData;
+  contractTitle?: string;
+  showDealNumber?: boolean;
+}) {
   return (
-    <div className="w-full pb-6 print:max-w-none print:px-0">
-      <OneContract data={data} contractTitle={contractTitle} />
-      <div className="mt-10 pt-8 border-t-2 border-dashed border-gray-300">
-        <OneContract data={data} contractTitle={contractTitle} />
-      </div>
+    <div className="print-duplex-sheet w-full pb-6 print:max-w-none print:px-0 print:pb-0">
+      <OneContract data={data} contractTitle={contractTitle} showDealNumber={showDealNumber} />
+      <div className="print-duplex-sep mt-10 pt-8 border-t-2 border-dashed border-gray-300" aria-hidden />
+      <OneContract data={data} contractTitle={contractTitle} showDealNumber={showDealNumber} />
     </div>
   );
 }

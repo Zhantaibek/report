@@ -18,17 +18,14 @@ const AGGREGATED_REPORT_CODES = new Set([
   'Auction_Bid_Classification',
   'Auction_Central_Depository',
   'Auction_Additional_Placement',
-  'Exchange_Contract',
-  'Exchange_Certificate',
   'Blank_Form_7',
   'StateHolding_Form7',
   'StateHolding_Form8',
   'StateHolding_Form9',
   'StateHolding_Form10',
+  'Blank_Form_06',
+  'StateHolding_Form5_Top5',
 ]);
-
-/** После SQL — только фильтры по классу/инструменту (без брокера). */
-const SQL_INSTRUMENT_CLASS_FILTER_CODES = AGGREGATED_REPORT_CODES;
 
 export async function runReport(params: RunReportParams): Promise<ReportResult> {
   const { reportFormId, dataSourceIds = [], filters } = params;
@@ -139,21 +136,13 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     }
   }
 
-  // Если использовался custom SQL с параметрами, фильтрация уже применена в запросе
-  // Для аукционов в строках нет brokerId — применяем только фильтр по инструменту
-  const postSqlFilters =
-    form.code === 'StateHolding_Form7'
-      ? { instrument: filters.instrument, classCode: filters.classCode, firmCode: filters.firmCode }
-      : SQL_INSTRUMENT_CLASS_FILTER_CODES.has(form.code)
-        ? { instrument: filters.instrument, classCode: filters.classCode }
-        : {
-            brokerId: filters.brokerId,
-            firmCode: filters.firmCode,
-            instrument: filters.instrument,
-            classCode: filters.classCode,
-          };
-
-  const filtered = sqlQuery ? applyFilters(withCommissions, postSqlFilters) : applyFilters(withCommissions, filters);
+  // Класс/инструмент уже в SQL ($3/$4). После SQL — только участник (покупатель или продавец).
+  const filtered = sqlQuery
+    ? applyFilters(withCommissions, {
+        brokerId: filters.brokerId,
+        firmCode: filters.firmCode,
+      })
+    : applyFilters(withCommissions, filters);
   const normalized = normalizeTradesForReport(filtered);
 
   if (form.type === 'table') {

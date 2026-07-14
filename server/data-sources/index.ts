@@ -51,15 +51,19 @@ export async function runCustomSqlQuery(
     database: string;
   };
 
-  // Параметры для кастомного SQL: $1=dateFrom, $2=dateTo
-  // Если даты не переданы, BETWEEN NULL AND NULL вернёт 0 строк — подставляем одну дату
+  // $1=dateFrom, $2=dateTo, $3=classCode, $4=instrument, $5=firmCode
+  // Передаём ровно столько параметров, сколько есть $N в SQL (иначе pg: "supplies 5, requires 4").
   const defaultDate = new Date().toISOString().slice(0, 10);
-  const params: (string | null)[] = [
+  const allParams: (string | null)[] = [
     filters?.dateFrom ?? defaultDate,
     filters?.dateTo ?? filters?.dateFrom ?? defaultDate,
     filters?.classCode?.trim() || null,
     filters?.instrument?.trim() || null,
+    filters?.firmCode?.trim() || null,
   ];
+  const paramIndexes = [...customSql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1]));
+  const maxParam = paramIndexes.length > 0 ? Math.max(...paramIndexes) : 0;
+  const params = allParams.slice(0, maxParam);
 
   let rows: Record<string, unknown>[];
   switch (ds.type) {

@@ -5,7 +5,7 @@
  * - Разделение на конкурентные и неконкурентные заявки
  */
 import React from 'react';
-import { cn } from '../../lib/utils.ts';
+import { parseGcbCirculationTerm } from '../../lib/gcb-circulation-term';
 import { ReportHeader } from './ReportHeader';
 
 export interface AuctionBid {
@@ -33,6 +33,7 @@ export interface AuctionSummaryData {
   secFullName: string;
   registrationNumber: string;
   couponRate: number;
+  participantCount: number;
   bids: AuctionBid[];
   summary: {
     competitiveQty: number;
@@ -74,6 +75,7 @@ function formatDate(date: string): string {
 export function AuctionSummaryReport({ data }: { data: AuctionSummaryData }) {
   const periodFrom = data.auctionDate || '';
   const periodTo = data.auctionDate || '';
+  const circulationTerm = parseGcbCirculationTerm(data.secCode);
   return (
     <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
@@ -83,186 +85,109 @@ export function AuctionSummaryReport({ data }: { data: AuctionSummaryData }) {
         periodTo={periodTo}
       />
 
-      {/* Информация об аукционе */}
+      {/* Общая сетка 6 кол.: разделитель инфо = правый край «По номиналу» */}
       <div className="overflow-x-auto mb-4">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+          </colgroup>
           <tbody>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium w-1/2">
-                Общая информация по аукциону
-              </td>
-              <td className="border border-border px-3 py-2">{formatDate(data.auctionDate)}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Дата аукциона</td>
-              <td className="border border-border px-3 py-2">{formatDate(data.auctionDate)}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Вид ГЦБ</td>
-              <td className="border border-border px-3 py-2">{data.className ?? data.classCode}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Срок обращения ГЦБ</td>
-              <td className="border border-border px-3 py-2"></td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Регистрационный номер</td>
-              <td className="border border-border px-3 py-2">{data.registrationNumber}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Количество ГЦБ (в штуках)</td>
-              <td className="border border-border px-3 py-2">{data.summary.totalQty > 0 ? formatInt(data.summary.totalQty) : 'null'}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Объем предложения</td>
-              <td className="border border-border px-3 py-2">{data.summary.totalNominal > 0 ? formatNumber(data.summary.totalNominal) : 'null'}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Купонная ставка (%)</td>
-              <td className="border border-border px-3 py-2">{data.couponRate > 0 ? formatNumber(data.couponRate) : ''}</td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Количество участников</td>
-              <td className="border border-border px-3 py-2"></td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Финансовые институты</td>
-              <td className="border border-border px-3 py-2"></td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Институциональные инвесторы, в том числе страховые компании</td>
-              <td className="border border-border px-3 py-2"></td>
-            </tr>
-            <tr>
-              <td className="border border-border px-3 py-2 bg-muted/30 font-medium">Инвесторы резидент/Нерезидент</td>
-              <td className="border border-border px-3 py-2"></td>
-            </tr>
+            {(
+              [
+                ['Общая информация по аукциону', formatDate(data.auctionDate)],
+                ['Дата аукциона', formatDate(data.auctionDate)],
+                ['Вид ГЦБ', data.className ?? data.classCode],
+                ['Срок обращения ГЦБ', circulationTerm],
+                ['Регистрационный номер', data.registrationNumber],
+                ['Количество ГЦБ (в штуках)', data.summary.totalQty > 0 ? formatInt(data.summary.totalQty) : 'null'],
+                ['Объем предложения', data.summary.totalNominal > 0 ? formatNumber(data.summary.totalNominal) : 'null'],
+                ['Купонная ставка (%)', data.couponRate > 0 ? formatNumber(data.couponRate) : ''],
+                ['Количество участников', data.participantCount > 0 ? formatInt(data.participantCount) : ''],
+                ['Финансовые институты', ''],
+                ['Институциональные инвесторы, в том числе страховые компании', ''],
+                ['Инвесторы резидент/Нерезидент', ''],
+              ] as const
+            ).map(([label, value]) => (
+              <tr key={label}>
+                <td colSpan={3} className="border border-border px-3 py-2 bg-muted/30">{label}</td>
+                <td colSpan={3} className="border border-border px-3 py-2">{value}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* Объем поступивших заявок на аукцион ГЦБ — 5 колонок по форме */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+          </colgroup>
           <thead>
             <tr className="bg-muted/60">
-              <th className="border border-border px-3 py-2 text-center font-medium">
-                Объем поступивших заявок на аукцион ГЦБ
-              </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
-                Кол-во ГЦБ (в штуках)
-              </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
-                По номиналу (в сомах)
-              </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
-                По факту (в сомах)
-              </th>
-              <th className="border border-border px-3 py-2 text-center font-medium">
-                % от общего объема поступивших
-              </th>
+              <th className="border border-border px-3 py-2 text-center font-medium">Объем поступивших заявок на аукцион ГЦБ</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">Кол-во ГЦБ (в штуках)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">По номиналу (в сомах)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">По факту (в сомах)</th>
+              <th colSpan={2} className="border border-border px-3 py-2 text-center font-medium">% от общего объема поступивших</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="bg-background">
-              <td className="border border-border px-3 py-2 font-medium">На конкурентной основе</td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatInt(data.summary.competitiveQty)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.competitiveNominal)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.competitiveValueActual)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.competitivePercent)}
-              </td>
-            </tr>
-            <tr className="bg-background">
-              <td className="border border-border px-3 py-2 font-medium">На неконкурентной</td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatInt(data.summary.nonCompetitiveQty)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.nonCompetitiveNominal)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.nonCompetitiveValueActual)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.nonCompetitivePercent)}
-              </td>
-            </tr>
-            <tr className="bg-primary/10 font-bold">
-              <td className="border border-border px-3 py-2">Всего</td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatInt(data.summary.totalQty)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.totalNominal)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">
-                {formatNumber(data.summary.totalValueActual)}
-              </td>
-              <td className="border border-border px-3 py-2 text-right tabular-nums">100.00</td>
-            </tr>
+            {(
+              [
+                ['На конкурентной основе', data.summary.competitiveQty, data.summary.competitiveNominal, data.summary.competitiveValueActual, data.summary.competitivePercent],
+                ['На неконкурентной', data.summary.nonCompetitiveQty, data.summary.nonCompetitiveNominal, data.summary.nonCompetitiveValueActual, data.summary.nonCompetitivePercent],
+                ['Всего', data.summary.totalQty, data.summary.totalNominal, data.summary.totalValueActual, 100],
+              ] as const
+            ).map(([label, qty, nominal, actual, pct], idx) => (
+              <tr key={label} className={idx === 2 ? 'bg-primary/10' : 'bg-background'}>
+                <td className="border border-border px-3 py-2">{label}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatInt(qty)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(nominal)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(actual)}</td>
+                <td colSpan={2} className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(pct)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* Заявки по ценам */}
-      <div className="mt-6">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-muted/60">
-                <th className="border border-border px-3 py-2 text-center font-medium">Цена (сом)</th>
-                <th className="border border-border px-3 py-2 text-center font-medium">Кол-во ГЦБ (в штуках)</th>
-                <th className="border border-border px-3 py-2 text-center font-medium">По номиналу (в сомах)</th>
-                <th className="border border-border px-3 py-2 text-center font-medium">По факту (в сомах)</th>
-                <th className="border border-border px-3 py-2 text-center font-medium">Доходность (%)</th>
-                <th className="border border-border px-3 py-2 text-center font-medium">Доходность по цене (%)</th>
+      <div className="mt-6 overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+            <col className="w-1/6" /><col className="w-1/6" /><col className="w-1/6" />
+          </colgroup>
+          <thead>
+            <tr className="bg-muted/60">
+              <th className="border border-border px-3 py-2 text-center font-medium">Цена (сом)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">Кол-во ГЦБ (в штуках)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">По номиналу (в сомах)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">По факту (в сомах)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">Доходность (%)</th>
+              <th className="border border-border px-3 py-2 text-center font-medium">Доходность по цене (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.priceGroups.map((group, idx) => (
+              <tr key={idx} className="bg-background">
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(group.price)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatInt(group.totalQty)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(group.nominalSum)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(group.valueActual)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(group.yieldPercent)}</td>
+                <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(group.yieldByPrice)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {data.priceGroups.map((group, idx) => (
-                <tr key={idx} className="bg-background">
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(group.price)}
-                  </td>
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatInt(group.totalQty)}
-                  </td>
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(group.nominalSum)}
-                  </td>
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(group.valueActual)}
-                  </td>
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(group.yieldPercent)}
-                  </td>
-                  <td className="border border-border px-3 py-2 text-right tabular-nums">
-                    {formatNumber(group.yieldByPrice)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Подписи */}
-      <div className="mt-8 flex justify-between text-sm hidden print:flex">
-        <div>
-          <p>Уполномоченное лицо ЗАО "Кыргызская Фондовая Биржа"</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
-        <div>
-          <p>Уполномоченное лицо ЗАО "Центральный"</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
+      <div className="mt-8 text-sm hidden print:block">
+        <p>Уполномоченное лицо ЗАО "Кыргызская Фондовая Биржа"</p>
+        <p className="mt-8">___________________________ м.п</p>
       </div>
     </div>
   );

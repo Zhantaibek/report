@@ -135,7 +135,9 @@ SelectItem.displayName = SelectPrimitive.Item.displayName;
 export interface SelectOption {
   value: string;
   label: string;
-  [key: string]: string;
+  /** Доп. классы пункта списка (например подсветка Oracle-отчётов) */
+  className?: string;
+  [key: string]: string | undefined;
 }
 
 export interface SelectOptionGroup {
@@ -398,6 +400,7 @@ function SelectWithSearch({
                   onMouseDown={(e) => { e.preventDefault(); handleSelect(opt.value); }}
                   className={cn(
                     'relative flex cursor-default select-none items-start rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
+                    opt.className,
                     selected && 'bg-muted'
                   )}
                 >
@@ -446,6 +449,7 @@ function SelectWithSearch({
                           }}
                           className={cn(
                             'relative flex cursor-default select-none items-start rounded-md py-2 pl-8 pr-4 text-sm font-normal outline-none hover:bg-muted',
+                            opt.className,
                             selected && 'bg-muted',
                           )}
                         >

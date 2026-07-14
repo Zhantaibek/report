@@ -86,6 +86,7 @@ npm run db:seed
 - **Blank_Form_2** - Форма 2: Отчет о заключенных сделках - агрегация (использует `baseTradesQuery`)
 - **Blank_Form_3** - Форма 3: Отчет о заключенных сделках по участникам (использует `baseTradesQuery`)
 - **Blank_Form_6A** - Форма 6А: Сводный отчет по сделкам (использует `baseTradesQuery`)
+- **Blank_Form_6B** - Форма 6Б: Сводный отчет по сделкам (использует `baseTradesQuery`)
 - **Blank_Form_9** - Форма 9: Ведомость заключенных сделок (использует `form9Query`)
 - **Blank_Form_USD** - Отчет USD
 

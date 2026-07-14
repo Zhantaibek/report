@@ -222,15 +222,9 @@ export function AuctionSummary2Report({ data, reportDate }: { data: AuctionSumma
       </div>
 
       {/* Подписи при печати */}
-      <div className="mt-8 flex justify-between text-sm hidden print:flex">
-        <div>
-          <p>Уполномоченное лицо ЗАО &quot;Кыргызская Фондовая Биржа&quot;</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
-        <div>
-          <p>Уполномоченное лицо ЗАО &quot;Центральный&quot;</p>
-          <p className="mt-8">___________________________ м.п</p>
-        </div>
+      <div className="mt-8 text-sm hidden print:block">
+        <p>Уполномоченное лицо ЗАО &quot;Кыргызская Фондовая Биржа&quot;</p>
+        <p className="mt-8">___________________________ м.п</p>
       </div>
     </div>
   );

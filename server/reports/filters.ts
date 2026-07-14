@@ -9,6 +9,23 @@ export interface ReportFilters {
   classCode?: string;
 }
 
+/** Участник = покупатель или продавец (в QUIK на сделку две ноги). */
+function tradeMatchesFirm(t: Trade, firmCode: string): boolean {
+  const row = t as Record<string, unknown>;
+  const ids = [
+    row.brokerCode,
+    row.brokerId,
+    row.buyerId,
+    row.sellerId,
+    row.counterparty,
+    row.buyerFirmId,
+    row.sellerFirmId,
+    row.firmId,
+    row.firm_id,
+  ];
+  return ids.some((id) => id != null && String(id) === firmCode);
+}
+
 export function applyFilters(trades: Trade[], filters: ReportFilters): Trade[] {
   let result = trades;
   if (filters.dateFrom) {
@@ -28,27 +45,28 @@ export function applyFilters(trades: Trade[], filters: ReportFilters): Trade[] {
     });
   }
   if (filters.brokerId != null) {
-    result = result.filter((t) => {
-      const brokerId = filters.brokerId!;
-      const isFirm = Number(t.brokerId) === brokerId || String(t.brokerCode) === String(brokerId);
-      const isCounterparty = String((t as any).counterparty ?? '') === String(brokerId);
-      return isFirm || isCounterparty;
-    });
+    const brokerId = String(filters.brokerId);
+    result = result.filter((t) => tradeMatchesFirm(t, brokerId));
   }
   if (filters.firmCode) {
-    const fc = filters.firmCode;
-    result = result.filter((t) => String(t.brokerCode ?? '') === fc);
+    const fc = String(filters.firmCode);
+    result = result.filter((t) => tradeMatchesFirm(t, fc));
   }
   if (filters.classCode) {
     const cc = filters.classCode.toLowerCase();
     result = result.filter((t) => {
-      return String((t as Record<string, unknown>).classCode ?? '').toLowerCase() === cc;
+      const row = t as Record<string, unknown>;
+      const code = String(row.classCode ?? row.class_code ?? '').toLowerCase();
+      return code === cc;
     });
   }
   if (filters.instrument) {
     const inst = filters.instrument.toLowerCase();
     result = result.filter((t) => {
-      const secCode = String((t as any).secCode ?? t.instrument ?? '').toLowerCase();
+      const row = t as Record<string, unknown>;
+      const secCode = String(
+        row.secCode ?? row.sec_code ?? row.cur_sec_code ?? row.registration_number ?? t.instrument ?? '',
+      ).toLowerCase();
       return secCode === inst || secCode.includes(inst);
     });
   }

@@ -123,7 +123,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
               return (
                 <React.Fragment key={pIdx}>
                   {/* Заголовок участника */}
-                  <tr className="bg-muted/80">
+                  <tr className="bg-emerald-50">
                     <td colSpan={8} className="border border-border px-3 py-2 font-semibold break-words">
                       Участник торгов: {participant.participantName}
                     </td>

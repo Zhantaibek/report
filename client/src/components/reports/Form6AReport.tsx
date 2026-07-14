@@ -68,14 +68,20 @@ export interface ReportForm6AData {
 
 interface Props {
   data: ReportForm6AData;
+  formNumber?: string;
+  title?: string;
 }
 
-export function Form6AReport({ data }: Props) {
+export function Form6AReport({
+  data,
+  formNumber = 'Ф-6А',
+  title = 'Сводный отчет по сделкам',
+}: Props) {
   return (
     <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
-        formNumber="Ф-6А"
-        title="Сводный отчет по сделкам"
+        formNumber={formNumber}
+        title={title}
         periodFrom={data.periodFrom}
         periodTo={data.periodTo}
       />

@@ -16,10 +16,12 @@ function normalizeReportCode(code: string): string {
   return code.trim().toLowerCase();
 }
 
-/** $3 — ClassCode, $4 — SecCode (ILIKE), NULL = без фильтра. */
+/** $3 — ClassCode, $4 — SecCode (ILIKE), $5 — FirmId, NULL = без фильтра. */
 const TRADES_CLASS_FILTER = '($3::text IS NULL OR t."ClassCode" = $3)';
 const TRADES_INSTRUMENT_FILTER = '($4::text IS NULL OR t."SecCode" ILIKE \'%\' || $4 || \'%\')';
+const TRADES_FIRM_FILTER = '($5::text IS NULL OR t."FirmId"::text = $5)';
 const TRADES_OPTIONAL_FILTERS = `${TRADES_CLASS_FILTER}\n    AND ${TRADES_INSTRUMENT_FILTER}`;
+const TRADES_OPTIONAL_FILTERS_WITH_FIRM = `${TRADES_OPTIONAL_FILTERS}\n    AND ${TRADES_FIRM_FILTER}`;
 const SEC_CLASS_FILTER = '($3::text IS NULL OR sec."ClassCode" = $3)';
 const SEC_INSTRUMENT_FILTER = '($4::text IS NULL OR sec."SecCode" ILIKE \'%\' || $4 || \'%\')';
 
@@ -27,19 +29,24 @@ const SEC_INSTRUMENT_FILTER = '($4::text IS NULL OR sec."SecCode" ILIKE \'%\' ||
  * CTE: одна строка на TradeNum для ноги сделки.
  * В Trades на один TradeNum две строки (Купля и Продажа) — всегда фильтровать Operation
  * и применять DISTINCT ON; после join buy+sell — снова DISTINCT ON в matched_trades.
+ *
+ * firmFilter: только для отчётов по одной ноге (Купля). Для buy+sell не включать —
+ * иначе останутся лишь сделки, где обе стороны = выбранный участник.
  */
 function cteDedupTradeLeg(
   alias: string,
   operation: 'Купля' | 'Продажа',
   dateBetween: string,
+  firmFilter = false,
 ): string {
+  const filters = firmFilter ? TRADES_OPTIONAL_FILTERS_WITH_FIRM : TRADES_OPTIONAL_FILTERS;
   return `${alias} AS (
   SELECT DISTINCT ON (t."TradeNum")
     t.*
   FROM "Trades" t
   WHERE t."Operation" = '${operation}'
     AND ${dateBetween}
-    AND ${TRADES_OPTIONAL_FILTERS}
+    AND ${filters}
   ORDER BY t."TradeNum", t."TradeDate" DESC
 )`;
 }
@@ -151,37 +158,33 @@ ORDER BY b."TradeNum", b."TradeDate" DESC
 
 /**
  * SQL для Формы 9 - Ведомость заключенных сделок
- * Особенности:
- * - Может использовать одну дату или диапазон (BETWEEN $1 AND $2)
- * - Группирует по TradeNum с агрегацией MAX
- * - Разделяет счета продавца и покупателя через CASE
- * - Присоединяет Securities для получения полного названия
+ * Купля/Продажа через JOIN; справочники через *_dedup.
  */
 const form9Query = `
-WITH unique_trades AS (
-  SELECT DISTINCT ON (t."TradeNum")
-    t.*
-  FROM "Trades" t
-  WHERE t."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
-    AND ${TRADES_OPTIONAL_FILTERS}
-  ORDER BY t."TradeNum", t."TradeDate" DESC
-)
-SELECT
-  t."TradeNum" AS "id",
-  MAX(t."ClassCode") AS "classCode",
-  MAX(COALESCE(c."ClassName", t."ClassCode")) AS "className",
-  MAX(t."SecCode") AS "secCode",
-  to_char(MAX(t."TradeDate"), 'YYYY-MM-DD') AS "tradeDate",
-  MAX(CASE WHEN t."Operation" = 'Продажа' THEN t."Account" END) AS "sellAccount",
-  MAX(CASE WHEN t."Operation" = 'Купля' THEN t."Account" END) AS "buyAccount",
-  MAX(t."Qty") AS "quantity",
-  MAX(t."Value") AS "value",
-  MAX(s."SecFullName") AS "secFullName"
-FROM unique_trades t
-LEFT JOIN "Securities" s ON t."SecCode" = s."SecCode"
-LEFT JOIN "Classes" c ON c."ClassCode" = t."ClassCode"
-GROUP BY t."TradeNum"
-ORDER BY t."TradeNum"
+WITH
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)},
+${cteClassesDedup()},
+${cteSecuritiesDedup()}
+SELECT DISTINCT ON (b."TradeNum")
+  b."TradeNum" AS "id",
+  b."ClassCode" AS "classCode",
+  COALESCE(c."ClassName", b."ClassCode") AS "className",
+  b."SecCode" AS "secCode",
+  to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  b."FirmId" AS "buyerFirmId",
+  s."FirmId" AS "sellerFirmId",
+  s."FirmId" AS "brokerCode",
+  s."Account" AS "sellAccount",
+  b."Account" AS "buyAccount",
+  b."Qty" AS "quantity",
+  b."Value" AS "value",
+  sec."SecFullName" AS "secFullName"
+FROM buy_trades b
+JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
+LEFT JOIN classes_dedup c ON c."ClassCode" = b."ClassCode"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
+ORDER BY b."TradeNum", b."TradeDate" DESC
 `.trim();
 
 /**
@@ -193,9 +196,28 @@ ORDER BY t."TradeNum"
  */
 const auctionSummaryQuery = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE, true)},
 ${cteSecuritiesDedup()},
-${cteClassesDedup()}
+${cteClassesDedup()},
+orders_dedup AS (
+  SELECT DISTINCT ON (o."OrderNum")
+    o."OrderNum",
+    o."SecCode",
+    o."FirmId"
+  FROM "Orders" o
+  WHERE o."TradeDate" BETWEEN $1 AND COALESCE($2, $1)
+    AND o."Operation" IN ('Купля', 'Покупка')
+    AND ${TRADES_OPTIONAL_FILTERS_WITH_FIRM.replace(/t\./g, 'o.')}
+  ORDER BY o."OrderNum", o."OrderDateTime" DESC
+),
+participants_by_sec AS (
+  SELECT
+    "SecCode",
+    COUNT(DISTINCT "FirmId")::int AS "participantCount"
+  FROM orders_dedup
+  WHERE "FirmId" IS NOT NULL AND TRIM("FirmId"::text) <> ''
+  GROUP BY "SecCode"
+)
 SELECT
   ROUND(b."Price", 2) AS "price",
   b."SecCode" AS "secCode",
@@ -208,6 +230,7 @@ SELECT
   ROUND(AVG(COALESCE(b."Yield", 0)), 2) AS "yieldByPrice",
   SUM(b."Qty") AS "totalQty",
   MAX(s."SecFullName") AS "secFullName",
+  COALESCE(MAX(p."participantCount"), 0) AS "participantCount",
   CASE 
     WHEN b."Price" > 0 THEN 'Конкурентная'
     ELSE 'Неконкурентная'
@@ -215,6 +238,7 @@ SELECT
 FROM buy_trades b
 LEFT JOIN securities_dedup s ON s."SecCode" = b."SecCode"
 LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN participants_by_sec p ON p."SecCode" = b."SecCode"
 GROUP BY b."Price", b."SecCode", 
   CASE 
     WHEN b."Price" > 0 THEN 'Конкурентная'
@@ -222,7 +246,6 @@ GROUP BY b."Price", b."SecCode",
   END
 ORDER BY b."Price" DESC
 `.trim();
-
 /**
  * Вторая сводная ведомость — сравнение текущего и предыдущего аукциона.
  * Одна дата: $1 = дата текущего аукциона (приложение передаёт также $2 = dateTo, используем COALESCE($1,$2)).
@@ -231,7 +254,7 @@ const AUCTION2_DATE_FILTER = 't."TradeDate"::date <= (COALESCE($1, $2))::date';
 const AUCTION_SINGLE_DATE_FILTER = 't."TradeDate"::date = (COALESCE($1, $2))::date';
 const auctionSummary2Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION2_DATE_FILTER)},
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION2_DATE_FILTER, true)},
 ${cteSecuritiesDedup()},
 
 -- Доходность при макс/мин цене за один проход
@@ -358,7 +381,7 @@ WHERE cur."TradeDate"::date = (COALESCE($1, $2))::date
  */
 const auctionBidClassificationQuery = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER, true)},
 ${cteSecuritiesDedup()},
 auction_totals AS (
   SELECT
@@ -403,7 +426,7 @@ ORDER BY b."SecCode", b."TradeDate", b.nominal_value DESC
  */
 const additionalPlacementQuery = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER, true)},
 ${cteSecuritiesDedup()},
 ${cteClassesDedup()}
 SELECT
@@ -438,7 +461,7 @@ ORDER BY u."TradeDate", u."SecCode"
  */
 const auctionCentralDepositoryQuery = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER)},
+${cteDedupTradeLeg('buy_trades', 'Купля', AUCTION_SINGLE_DATE_FILTER, true)},
 ${cteSecuritiesDedup()},
 auction_totals AS (
   SELECT
@@ -481,12 +504,16 @@ ORDER BY b."SecCode", b."TradeDate", b.actual_value DESC
 /**
  * SQL для Биржевого контракта (один документ на сделку).
  * Продавец/покупатель через JOIN по Operation.
+ * Справочники только через *_dedup — иначе дубли Firms/Securities размножают строки.
  */
 const exchangeContractQuery = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
-${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)}
-SELECT
+${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)},
+${cteFirmsDedup()},
+${cteClassesDedup()},
+${cteSecuritiesDedup()}
+SELECT DISTINCT ON (b."TradeNum")
   b."TradeNum" AS "id",
   to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
   to_char(b."TradeDateTime", 'HH24:MI:SS') AS "tradeDateTime",
@@ -494,6 +521,9 @@ SELECT
   COALESCE(cl."ClassName", b."ClassCode") AS "className",
   b."SecCode" AS "secCode",
   sec."SecFullName" AS "secFullName",
+  b."FirmId" AS "buyerFirmId",
+  s."FirmId" AS "sellerFirmId",
+  s."FirmId" AS "brokerCode",
   COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS "sellerName",
   s."Account" AS "sellAccount",
   NULLIF(TRIM(s."ClientCode"), '') AS "sellerClientCode",
@@ -504,14 +534,15 @@ SELECT
   b."Price" AS "price",
   b."Value" AS "value",
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
+  b."Yield" AS "yield",
   NULL::numeric AS "couponRate"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
-LEFT JOIN "Firms" bf ON bf."FirmId" = b."FirmId"
-LEFT JOIN "Firms" sf ON sf."FirmId" = s."FirmId"
-LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
-LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
-ORDER BY b."TradeNum"
+LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+LEFT JOIN firms_dedup sf ON sf."FirmId" = s."FirmId"
+LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
+ORDER BY b."TradeNum", b."TradeDate" DESC
 `.trim();
 
 /**
@@ -538,7 +569,8 @@ const form4Query = baseTradesQuery;
  */
 const form8Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)}
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE, true)},
+${cteSecuritiesDedup()}
 SELECT
   to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
   sec."SecFullName" AS "companyName",
@@ -548,7 +580,7 @@ SELECT
   b."Qty" AS "quantity",
   b."Value" AS "value"
 FROM buy_trades b
-LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
 ORDER BY b."TradeDate", sec."SecFullName", b."SecCode", b."TradeNum"
 `.trim();
 
@@ -570,7 +602,7 @@ index_universe AS (
        AND LOWER(COALESCE(cl."ClassName", sec."ClassCode", '')) LIKE '%акц%'
      )
 ),
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE, true)},
 period_weights AS (
   SELECT
     t."SecCode",
@@ -623,7 +655,7 @@ ORDER BY dc.d
  */
 const stateHoldingForm5Top5Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE, true)},
 ${cteFirmsDedup()},
 __MARKET_RULES_CTE__,
 base AS (
@@ -712,6 +744,55 @@ ORDER BY rp."seqNo" ASC, bd.d ASC
 `.trim();
 
 /**
+ * Сводная ведомость заявок — заявки из Orders, одна строка на OrderNum.
+ * Фильтры: $1/$2 даты, $3 ClassCode, $4 SecCode, $5 FirmId.
+ */
+const ordersSummaryQuery = `
+WITH
+orders_dedup AS (
+  SELECT DISTINCT ON (o."OrderNum")
+    o."OrderNum",
+    o."OrderDateTime",
+    o."TradeDate",
+    o."Operation",
+    o."Qty",
+    o."Price",
+    o."Value",
+    o."SecCode",
+    o."ClassCode",
+    o."FirmId"
+  FROM "Orders" o
+  WHERE o."TradeDate"::date BETWEEN $1::date AND COALESCE($2::date, $1::date)
+    AND ($3::text IS NULL OR o."ClassCode" = $3)
+    AND ($4::text IS NULL OR o."SecCode" ILIKE '%' || $4 || '%')
+    AND ($5::text IS NULL OR o."FirmId"::text = $5)
+  ORDER BY o."OrderNum", o."OrderDateTime" DESC
+),
+${cteSecuritiesDedup()}
+SELECT
+  d."OrderNum"::text AS id,
+  d."OrderNum"::text AS "orderNum",
+  to_char(d."OrderDateTime", 'YYYY-MM-DD HH24:MI:SS') AS "orderDateTime",
+  CASE
+    WHEN d."Operation" IN ('Купля', 'Покупка') THEN 'покупка'
+    WHEN d."Operation" = 'Продажа' THEN 'продажа'
+    ELSE LOWER(COALESCE(d."Operation", ''))
+  END AS "direction",
+  ROUND(COALESCE(d."Qty", 0), 0) AS "quantity",
+  ROUND(COALESCE(d."Price", 0), 2) AS "price",
+  ROUND(COALESCE(NULLIF(d."Value", 0), d."Qty" * d."Price", 0), 2) AS "volume",
+  d."SecCode" AS "secCode",
+  COALESCE(NULLIF(TRIM(sec."SecFullName"), ''), d."SecCode") AS "secFullName",
+  COALESCE(NULLIF(TRIM(sec."ISINCode"), ''), d."SecCode") AS "isinCode",
+  d."ClassCode" AS "classCode",
+  d."FirmId"::text AS "firmId",
+  d."FirmId"::text AS "firmCode"
+FROM orders_dedup d
+LEFT JOIN securities_dedup sec ON sec."SecCode" = d."SecCode"
+ORDER BY COALESCE(NULLIF(TRIM(sec."SecFullName"), ''), d."SecCode"), d."OrderDateTime", d."OrderNum"
+`.trim();
+
+/**
  * Госхолдинг Форма 9 — Информация о торгах (котировки / приказы).
  * Каждая строка — одна сделка: код ЦБ, кол-во, цена покупки, цена продажи, дата и время.
  */
@@ -741,7 +822,7 @@ ORDER BY b."TradeDate", b."SecCode"
  */
 const stateHoldingForm8Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE, true)},
 ${cteClassesDedup()},
 ${cteSecuritiesDedup()},
 latest_prices AS (
@@ -779,7 +860,7 @@ ORDER BY sec."ClassCode", sec."SecFullName"
  */
 const stateHoldingForm7Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE)},
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE_DATE, true)},
 ${cteFirmsDedup()},
 legs AS (
   SELECT DISTINCT ON (b."TradeNum")
@@ -828,7 +909,9 @@ ORDER BY "brokerCode", "secCode", "tradeDate"
  */
 const form7Query = `
 WITH
-${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)}
+${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE, true)},
+${cteClassesDedup()},
+${cteSecuritiesDedup()}
 SELECT
   b."ClassCode" AS "classCode",
   COALESCE(cl."ClassName", b."ClassCode") AS "sector",
@@ -842,8 +925,8 @@ SELECT
   ROUND(SUM(b."Price" * b."Qty") / NULLIF(SUM(b."Qty"), 0), 2) AS "avgPrice",
   SUM(b."Value") AS "volume"
 FROM buy_trades b
-LEFT JOIN "Classes" cl ON cl."ClassCode" = b."ClassCode"
-LEFT JOIN "Securities" sec ON sec."SecCode" = b."SecCode"
+LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
+LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
 GROUP BY b."ClassCode", COALESCE(cl."ClassName", b."ClassCode"), b."SecCode", sec."SecFullName", b."TradeDate"
 ORDER BY COALESCE(cl."ClassName", b."ClassCode"), sec."SecFullName", b."TradeDate"
 `.trim();
@@ -919,6 +1002,23 @@ export const reportDefinitions: ReportDefinition[] = [
     sql: baseTradesQuery,
   },
   {
+    code: 'Blank_Form_6B',
+    name: 'Blank_Form_6B',
+    description: 'Форма 6Б - Сводный отчет по сделкам',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_06',
+    name: 'Blank_Form_06',
+    description:
+      'Форма 06 - Сведения о 5 участниках торгов с наибольшей суммой сделок (по рабочим дням периода)',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: stateHoldingForm5Top5Query,
+  },
+  {
     code: 'Blank_Form_7',
     name: 'Blank_Form_7',
     description: 'Форма 7 - Отчёт по сделкам по секторам',
@@ -934,6 +1034,46 @@ export const reportDefinitions: ReportDefinition[] = [
     category: 'Отчеты по системной информации',
     singleDate: true,
     sql: form9Query,
+  },
+  {
+    code: 'Blank_Form_13',
+    name: 'Blank_Form_13',
+    description: 'Форма 13 - Отчет по комиссионным сборам',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_14',
+    name: 'Blank_Form_14',
+    description: 'Форма 14 - Отчет по структуре комиссионного сбора (по участникам)',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_15',
+    name: 'Blank_Form_15',
+    description: 'Форма 15 - Отчет по структуре комиссионного сбора',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'Orders_Summary',
+    name: 'Orders_Summary',
+    description: 'Сводная ведомость заявок',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: ordersSummaryQuery,
+  },
+  {
+    code: 'Trades_By_Sec',
+    name: 'Trades_By_Sec',
+    description: 'Отчет о сделках по ЦБ',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
   },
   {
     code: 'Blank_Form_USD',
@@ -1035,6 +1175,24 @@ export const reportDefinitions: ReportDefinition[] = [
     category: 'Отчеты по Аукциону',
     singleDate: true,
     sql: additionalPlacementQuery,
+  },
+  {
+    code: 'Auction_Exchange_Contract',
+    name: 'Auction_Exchange_Contract',
+    description: 'Биржевой контракт',
+    type: 'table',
+    category: 'Отчеты по Аукциону',
+    singleDate: true,
+    sql: exchangeContractQuery,
+  },
+  {
+    code: 'Auction_Exchange_Certificate',
+    name: 'Auction_Exchange_Certificate',
+    description: 'Биржевое свидетельство',
+    type: 'table',
+    category: 'Отчеты по Аукциону',
+    singleDate: true,
+    sql: exchangeContractQuery,
   },
   {
     code: 'Exchange_Contract',

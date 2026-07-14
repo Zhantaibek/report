@@ -124,7 +124,7 @@ export function StateHoldingForm7Report({ data }: Props) {
           <tbody>
             {data.firms.map((firm, fIdx) => (
               <React.Fragment key={fIdx}>
-                <tr className="bg-emerald-50/80">
+                <tr className="bg-emerald-50">
                   <td className="border border-border px-2 py-1 font-medium" colSpan={9}>
                     Брокер (покупатель): {firm.brokerName || firm.brokerCode}
                   </td>

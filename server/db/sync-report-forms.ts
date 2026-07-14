@@ -7,6 +7,11 @@ export async function syncReportForms(): Promise<void> {
   const existingForms = await reportFormsRepo.getReportForms();
   const existingCodes = new Set(existingForms.map((f) => f.code));
 
+  const removed = await reportFormsRepo.deleteReportFormsByCodePrefix('Test_Auction_');
+  if (removed > 0) {
+    console.log(`[sync] Removed ${removed} test auction report form(s)`);
+  }
+
   for (const def of reportDefinitions) {
     if (!existingCodes.has(def.code)) {
       await reportFormsRepo.createReportForm({
