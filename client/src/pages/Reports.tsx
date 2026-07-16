@@ -639,6 +639,14 @@ export default function Reports() {
       return { totalRecords: 1, totalPages: 1 };
     }
 
+    // Форма 6А — только первичный рынок; 6Б — только вторичный
+    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B') {
+      const market = code === 'Blank_Form_6A' ? 'primary' : 'secondary';
+      const filtered = rows.filter((r) => String(r.marketType ?? '') === market);
+      const n = filtered.length;
+      return n > 0 ? { totalRecords: n, totalPages: Math.ceil(n / limit) || 0 } : null;
+    }
+
     // Форма 13 — одна сводная страница
     if (code === 'Blank_Form_13') {
       return { totalRecords: 1, totalPages: 1 };
@@ -769,10 +777,12 @@ export default function Reports() {
       );
     }
 
-    // ── Blank_Form_6A / Blank_Form_6B ───────────────────────────────────────
+    // ── Blank_Form_6A (первичный) / Blank_Form_6B (вторичный) ───────────────
     if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B') {
-      if (!tableRows?.length) return null;
-      const { pagedRows } = getPagedRows(tableRows);
+      const market = code === 'Blank_Form_6A' ? 'primary' : 'secondary';
+      const marketRows = (tableRows ?? []).filter((r) => String(r.marketType ?? '') === market);
+      if (!marketRows.length) return null;
+      const { pagedRows } = paginate(marketRows, page, limit, isPrinting);
       const reportData = { periodFrom: dateFrom, periodTo: dateTo, classes: groupByClassSecAndDate(pagedRows) };
       return (
         <div className="mt-6" key={`${code.toLowerCase()}-${page}`}>
@@ -804,6 +814,7 @@ export default function Reports() {
       if (!tableRows?.length) return null;
       const { pagedRows, totalPages } = getPagedRows(tableRows);
       const { totalQuantity, totalAmount: totalValue, totalTrades, totalSecurities } = calcTotalsWithUnique(tableRows);
+      const totalAccruedInt = tableRows.reduce((sum, r) => sum + Number(r.accruedInt ?? 0), 0);
       return (
         <div className="mt-6" key={`form9-${page}`}>
           <Form9Report
@@ -811,7 +822,9 @@ export default function Reports() {
               periodFrom: dateFrom,
               periodTo: dateTo,
               classes: groupByClassAndSecForm9(pagedRows),
-              totalSummary: (isPrinting || page === totalPages) ? { totalQuantity, totalValue, totalTrades, totalSecurities } : undefined,
+              totalSummary: (isPrinting || page === totalPages)
+                ? { totalQuantity, totalValue, totalAccruedInt, totalTrades, totalSecurities }
+                : undefined,
             }}
           />
         </div>
@@ -1884,7 +1897,7 @@ function groupByParticipantAndClassAndSec(rows: Record<string, unknown>[]): Part
   return participants;
 }
 
-// Группировка для формы 6A: Класс -> ЦБ -> Сделки
+// Группировка для формы 6А/6Б: Класс -> ЦБ -> Сделки
 function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
   const { classMap, classCodeToName } = buildClassSecMap(rows);
 
@@ -2468,10 +2481,13 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
     trades: {
       id: string;
       tradeDate: string;
+      sellerName: string;
       sellAccount: string;
+      buyerName: string;
       buyAccount: string;
       quantity: number;
       value: number;
+      accruedInt: number;
     }[];
   }[];
 }[] {
@@ -2502,10 +2518,13 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
       trades: {
         id: string;
         tradeDate: string;
+        sellerName: string;
         sellAccount: string;
+        buyerName: string;
         buyAccount: string;
         quantity: number;
         value: number;
+        accruedInt: number;
       }[];
     }[];
   }[] = [];
@@ -2517,10 +2536,13 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
       trades: {
         id: string;
         tradeDate: string;
+        sellerName: string;
         sellAccount: string;
+        buyerName: string;
         buyAccount: string;
         quantity: number;
         value: number;
+        accruedInt: number;
       }[];
     }[] = [];
 
@@ -2528,10 +2550,13 @@ function groupByClassAndSecForm9(rows: Record<string, unknown>[]): {
       const trades = tradesData.map((trade) => ({
         id: String(trade.id ?? ''),
         tradeDate: String(trade.tradeDate ?? '').slice(0, 10),
+        sellerName: String(trade.sellerName ?? ''),
         sellAccount: String(trade.sellAccount ?? ''),
+        buyerName: String(trade.buyerName ?? ''),
         buyAccount: String(trade.buyAccount ?? ''),
         quantity: Number(trade.quantity ?? 0),
         value: Number(trade.value ?? 0),
+        accruedInt: Number(trade.accruedInt ?? 0),
       }));
 
       securities.push({

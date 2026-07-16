@@ -164,6 +164,7 @@ const form9Query = `
 WITH
 ${cteDedupTradeLeg('buy_trades', 'Купля', TRADES_DATE_BETWEEN_COALESCE)},
 ${cteDedupTradeLeg('sell_trades', 'Продажа', TRADES_DATE_BETWEEN_COALESCE)},
+${cteFirmsDedup()},
 ${cteClassesDedup()},
 ${cteSecuritiesDedup()}
 SELECT DISTINCT ON (b."TradeNum")
@@ -175,13 +176,18 @@ SELECT DISTINCT ON (b."TradeNum")
   b."FirmId" AS "buyerFirmId",
   s."FirmId" AS "sellerFirmId",
   s."FirmId" AS "brokerCode",
+  COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS "sellerName",
   s."Account" AS "sellAccount",
+  COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS "buyerName",
   b."Account" AS "buyAccount",
   b."Qty" AS "quantity",
   b."Value" AS "value",
+  COALESCE(b."Accruedint", s."Accruedint", 0) AS "accruedInt",
   sec."SecFullName" AS "secFullName"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
+LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
+LEFT JOIN firms_dedup sf ON sf."FirmId" = s."FirmId"
 LEFT JOIN classes_dedup c ON c."ClassCode" = b."ClassCode"
 LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
 ORDER BY b."TradeNum", b."TradeDate" DESC
@@ -996,7 +1002,7 @@ export const reportDefinitions: ReportDefinition[] = [
   {
     code: 'Blank_Form_6A',
     name: 'Blank_Form_6A',
-    description: 'Форма 6А - Сводный отчет по сделкам',
+    description: 'Форма 6А - Сводный отчет по сделкам (первичный рынок)',
     type: 'table',
     category: 'Отчеты по системной информации',
     sql: baseTradesQuery,
@@ -1004,7 +1010,7 @@ export const reportDefinitions: ReportDefinition[] = [
   {
     code: 'Blank_Form_6B',
     name: 'Blank_Form_6B',
-    description: 'Форма 6Б - Сводный отчет по сделкам',
+    description: 'Форма 6Б - Сводный отчет по сделкам (вторичный рынок)',
     type: 'table',
     category: 'Отчеты по системной информации',
     sql: baseTradesQuery,

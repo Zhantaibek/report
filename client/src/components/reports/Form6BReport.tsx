@@ -10,7 +10,7 @@ interface Props {
   data: ReportForm6BData;
 }
 
-/** Форма 6Б — тот же сводный отчёт по сделкам, что и 6А. */
+/** Форма 6Б — сводный отчёт по сделкам вторичного рынка (данные фильтруются в Reports). */
 export function Form6BReport({ data }: Props) {
   return (
     <Form6AReport
