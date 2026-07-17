@@ -146,7 +146,8 @@ SELECT DISTINCT ON (b."TradeNum")
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   b."Price" AS "price",
   b."Qty" AS "quantity",
-  b."Value" AS "value"
+  b."Value" AS "value",
+  COALESCE(b."Accruedint", s."Accruedint", 0) AS "accruedInt"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
@@ -1011,6 +1012,14 @@ export const reportDefinitions: ReportDefinition[] = [
     code: 'Blank_Form_6B',
     name: 'Blank_Form_6B',
     description: 'Форма 6Б - Сводный отчет по сделкам (вторичный рынок)',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+    sql: baseTradesQuery,
+  },
+  {
+    code: 'Blank_Form_6B_NKD',
+    name: 'Blank_Form_6B_NKD',
+    description: 'Форма 6Б - Сводный отчет по сделкам (вторичный рынок + НКД)',
     type: 'table',
     category: 'Отчеты по системной информации',
     sql: baseTradesQuery,

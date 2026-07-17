@@ -32,6 +32,7 @@ import Form3Report, {
 } from '../components/reports/Form3Report.tsx';
 import { Form6AReport, type ClassData, type SecurityData, type TradeData } from '../components/reports/Form6AReport.tsx';
 import { Form6BReport } from '../components/reports/Form6BReport.tsx';
+import { Form6BNKDReport } from '../components/reports/Form6BNKDReport.tsx';
 import { Form9Report, type ReportForm9Data } from '../components/reports/Form9Report.tsx';
 import { AuctionSummaryReport, type AuctionSummaryData } from '../components/reports/AuctionSummaryReport.tsx';
 import { AuctionSummary2Report, type AuctionSummary2Row } from '../components/reports/AuctionSummary2Report.tsx';
@@ -117,6 +118,7 @@ const FORM_META: Record<string, FormMeta> = {
   Blank_Form_6:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_6A:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_6B:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
+  Blank_Form_6B_NKD: { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_06:  { customView: true, dataSource: 'quik', filterMode: 'none' },
   Blank_Form_7:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_8:   { customView: true, dataSource: 'quik', filterMode: 'quik' },
@@ -639,8 +641,8 @@ export default function Reports() {
       return { totalRecords: 1, totalPages: 1 };
     }
 
-    // Форма 6А — только первичный рынок; 6Б — только вторичный
-    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B') {
+    // Форма 6А — только первичный рынок; 6Б / 6Б НКД — только вторичный
+    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B' || code === 'Blank_Form_6B_NKD') {
       const market = code === 'Blank_Form_6A' ? 'primary' : 'secondary';
       const filtered = rows.filter((r) => String(r.marketType ?? '') === market);
       const n = filtered.length;
@@ -777,8 +779,8 @@ export default function Reports() {
       );
     }
 
-    // ── Blank_Form_6A (первичный) / Blank_Form_6B (вторичный) ───────────────
-    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B') {
+    // ── Blank_Form_6A (первичный) / Blank_Form_6B / 6B_NKD (вторичный) ─────
+    if (code === 'Blank_Form_6A' || code === 'Blank_Form_6B' || code === 'Blank_Form_6B_NKD') {
       const market = code === 'Blank_Form_6A' ? 'primary' : 'secondary';
       const marketRows = (tableRows ?? []).filter((r) => String(r.marketType ?? '') === market);
       if (!marketRows.length) return null;
@@ -786,9 +788,11 @@ export default function Reports() {
       const reportData = { periodFrom: dateFrom, periodTo: dateTo, classes: groupByClassSecAndDate(pagedRows) };
       return (
         <div className="mt-6" key={`${code.toLowerCase()}-${page}`}>
-          {code === 'Blank_Form_6B'
-            ? <Form6BReport data={reportData} />
-            : <Form6AReport data={reportData} />}
+          {code === 'Blank_Form_6B_NKD'
+            ? <Form6BNKDReport data={reportData} />
+            : code === 'Blank_Form_6B'
+              ? <Form6BReport data={reportData} />
+              : <Form6AReport data={reportData} />}
         </div>
       );
     }
@@ -1897,7 +1901,7 @@ function groupByParticipantAndClassAndSec(rows: Record<string, unknown>[]): Part
   return participants;
 }
 
-// Группировка для формы 6А/6Б: Класс -> ЦБ -> Сделки
+// Группировка для формы 6А/6Б/6Б НКД: Класс -> ЦБ -> Сделки
 function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
   const { classMap, classCodeToName } = buildClassSecMap(rows);
 
@@ -1908,6 +1912,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
     let classTotalTrades = 0;
     let classTotalQuantity = 0;
     let classTotalValue = 0;
+    let classTotalAccruedInt = 0;
     const classUniqueTradeIds = new Set<string>();
     let classMaxPrice = 0;
 
@@ -1918,6 +1923,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
       let secTotalPriceWeighted = 0;
       let secTotalQty = 0;
       let secTotalValue = 0;
+      let secTotalAccruedInt = 0;
 
       // Обрабатываем каждую сделку отдельно
       for (const trade of tradesData) {
@@ -1925,6 +1931,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
         const price = Number(trade.price ?? 0);
         const qty = Number(trade.quantity ?? 0);
         const value = Number(trade.value ?? 0);
+        const accruedInt = Number(trade.accruedInt ?? 0);
         const tradeDate = String(trade.tradeDate ?? '').slice(0, 10);
 
         if (tradeId) classUniqueTradeIds.add(tradeId);
@@ -1934,6 +1941,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
         secTotalPriceWeighted += price * qty;
         secTotalQty += qty;
         secTotalValue += value;
+        secTotalAccruedInt += accruedInt;
 
         classMaxPrice = Math.max(classMaxPrice, price);
 
@@ -1946,6 +1954,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
           avgPrice: price,
           secCode,
           totalValue: value,
+          accruedInt,
         });
       }
 
@@ -1958,6 +1967,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
         totalTrades: tradesData.length,
         totalQuantity: secTotalQty,
         totalValue: secTotalValue,
+        totalAccruedInt: secTotalAccruedInt,
         avgPrice: secAvgPrice,
         maxPrice: secMaxPrice,
         minPrice: secMinPrice === Infinity ? 0 : secMinPrice,
@@ -1966,6 +1976,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
       classTotalTrades += tradesData.length;
       classTotalQuantity += secTotalQty;
       classTotalValue += secTotalValue;
+      classTotalAccruedInt += secTotalAccruedInt;
     }
 
     const classAvgPriceWeighted = securities.reduce((sum, sec) => sum + sec.avgPrice * sec.totalValue, 0);
@@ -1979,6 +1990,7 @@ function groupByClassSecAndDate(rows: Record<string, unknown>[]): ClassData[] {
       totalSecurities: securities.length,
       totalQuantity: classTotalQuantity,
       totalValue: classTotalValue,
+      totalAccruedInt: classTotalAccruedInt,
       avgPrice: classAvgPrice,
       maxPrice: classMaxPrice,
     });

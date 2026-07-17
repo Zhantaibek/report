@@ -32,6 +32,7 @@ export interface TradeData {
   avgPrice: number;
   secCode: string; // Per № ЦБ
   totalValue: number;
+  accruedInt?: number;
 }
 
 // Данные по ценной бумаге
@@ -42,6 +43,7 @@ export interface SecurityData {
   totalTrades: number;
   totalQuantity: number; // Общее количество ЦБ
   totalValue: number;
+  totalAccruedInt?: number;
   avgPrice: number;
   maxPrice: number;
   minPrice: number;
@@ -56,6 +58,7 @@ export interface ClassData {
   totalSecurities: number;
   totalQuantity: number; // Общее количество ЦБ в классе
   totalValue: number;
+  totalAccruedInt?: number;
   avgPrice: number;
   maxPrice: number;
 }
@@ -70,13 +73,17 @@ interface Props {
   data: ReportForm6AData;
   formNumber?: string;
   title?: string;
+  showAccruedInt?: boolean;
 }
 
 export function Form6AReport({
   data,
   formNumber = 'Ф-6А',
   title = 'Сводный отчет по сделкам',
+  showAccruedInt = false,
 }: Props) {
+  const colSpan = showAccruedInt ? 9 : 8;
+
   return (
     <div className="w-full bg-white pb-6 text-xs print:max-w-none print:px-0 print:pb-0">
       <ReportHeader
@@ -99,6 +106,9 @@ export function Form6AReport({
               <th className="border border-border px-3 py-2 text-right font-medium">Средняя<br/>цена</th>
               <th className="border border-border px-3 py-2 text-center font-medium">Per № ЦБ</th>
               <th className="border border-border px-3 py-2 text-right font-medium">Объем сделок</th>
+              {showAccruedInt && (
+                <th className="border border-border px-3 py-2 text-right font-medium">НКД</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -106,7 +116,7 @@ export function Form6AReport({
               <React.Fragment key={clsIdx}>
                 {/* Класс заголовок */}
                 <tr className="bg-muted/70">
-                  <td colSpan={8} className="border border-border px-3 py-2 font-semibold">
+                  <td colSpan={colSpan} className="border border-border px-3 py-2 font-semibold">
                     Класс: {cls.className ?? cls.classCode}
                   </td>
                 </tr>
@@ -116,7 +126,7 @@ export function Form6AReport({
                   <React.Fragment key={secIdx}>
                     {/* ЦБ заголовок */}
                     <tr className="bg-muted/50">
-                      <td colSpan={8} className="border border-border px-3 py-2 font-medium">
+                      <td colSpan={colSpan} className="border border-border px-3 py-2 font-medium">
                         Ценная Бумага: {sec.secFullName ?? sec.secCode}
                       </td>
                     </tr>
@@ -132,6 +142,11 @@ export function Form6AReport({
                         <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(trade.avgPrice)}</td>
                         <td className="border border-border px-3 py-2 text-center">{trade.secCode}</td>
                         <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(trade.totalValue)}</td>
+                        {showAccruedInt && (
+                          <td className="border border-border px-3 py-2 text-right tabular-nums">
+                            {formatNumber(trade.accruedInt)}
+                          </td>
+                        )}
                       </tr>
                     ))}
 
@@ -145,6 +160,11 @@ export function Form6AReport({
                       <td className="border border-border px-3 py-2 text-right tabular-nums font-semibold">{formatNumber(sec.avgPrice)}</td>
                       <td className="border border-border px-3 py-2 text-center"></td>
                       <td className="border border-border px-3 py-2 text-right tabular-nums font-semibold">{formatNumber(sec.totalValue)}</td>
+                      {showAccruedInt && (
+                        <td className="border border-border px-3 py-2 text-right tabular-nums font-semibold">
+                          {formatNumber(sec.totalAccruedInt)}
+                        </td>
+                      )}
                     </tr>
                   </React.Fragment>
                 ))}
@@ -159,6 +179,11 @@ export function Form6AReport({
                   <td className="border border-border px-3 py-2 text-right tabular-nums font-bold">{formatNumber(cls.avgPrice)}</td>
                   <td className="border border-border px-3 py-2 text-center"></td>
                   <td className="border border-border px-3 py-2 text-right tabular-nums font-bold">{formatNumber(cls.totalValue)}</td>
+                  {showAccruedInt && (
+                    <td className="border border-border px-3 py-2 text-right tabular-nums font-bold">
+                      {formatNumber(cls.totalAccruedInt)}
+                    </td>
+                  )}
                 </tr>
               </React.Fragment>
             ))}
@@ -168,4 +193,3 @@ export function Form6AReport({
     </div>
   );
 }
-
