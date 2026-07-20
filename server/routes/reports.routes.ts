@@ -306,8 +306,8 @@ router.get('/daily-volumes', async (req, res) => {
         FROM "Trades" t
         WHERE t."Operation" = 'Купля'
           AND t."TradeDate" BETWEEN $1 AND $2
-          AND ($3::text IS NULL OR t."ClassCode" = $3)
-          AND ($4::text IS NULL OR t."SecCode" ILIKE '%' || $4 || '%')
+          AND ($3::text[] IS NULL OR t."ClassCode" = ANY($3))
+          AND ($4::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($4::text[]) AS pat WHERE t."SecCode" ILIKE '%' || pat || '%'))
         ORDER BY t."TradeNum", t."TradeDate" DESC
       )
       SELECT

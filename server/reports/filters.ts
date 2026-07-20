@@ -4,9 +4,16 @@ export interface ReportFilters {
   dateFrom?: string;
   dateTo?: string;
   brokerId?: number;
-  firmCode?: string;
-  instrument?: string;
-  classCode?: string;
+  firmCode?: string | string[];
+  instrument?: string | string[];
+  classCode?: string | string[];
+}
+
+/** Нормализация фильтра к массиву непустых строк. */
+export function normalizeFilterValues(v?: string | string[] | null): string[] | undefined {
+  if (v == null) return undefined;
+  const list = (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).filter(Boolean);
+  return list.length > 0 ? list : undefined;
 }
 
 /** Участник = покупатель или продавец (в QUIK на сделку две ноги). */
@@ -48,26 +55,28 @@ export function applyFilters(trades: Trade[], filters: ReportFilters): Trade[] {
     const brokerId = String(filters.brokerId);
     result = result.filter((t) => tradeMatchesFirm(t, brokerId));
   }
-  if (filters.firmCode) {
-    const fc = String(filters.firmCode);
-    result = result.filter((t) => tradeMatchesFirm(t, fc));
+  const firmCodes = normalizeFilterValues(filters.firmCode);
+  if (firmCodes) {
+    result = result.filter((t) => firmCodes.some((fc) => tradeMatchesFirm(t, fc)));
   }
-  if (filters.classCode) {
-    const cc = filters.classCode.toLowerCase();
+  const classCodes = normalizeFilterValues(filters.classCode);
+  if (classCodes) {
+    const set = new Set(classCodes.map((c) => c.toLowerCase()));
     result = result.filter((t) => {
       const row = t as Record<string, unknown>;
       const code = String(row.classCode ?? row.class_code ?? '').toLowerCase();
-      return code === cc;
+      return set.has(code);
     });
   }
-  if (filters.instrument) {
-    const inst = filters.instrument.toLowerCase();
+  const instruments = normalizeFilterValues(filters.instrument);
+  if (instruments) {
+    const pats = instruments.map((i) => i.toLowerCase());
     result = result.filter((t) => {
       const row = t as Record<string, unknown>;
       const secCode = String(
         row.secCode ?? row.sec_code ?? row.cur_sec_code ?? row.registration_number ?? t.instrument ?? '',
       ).toLowerCase();
-      return secCode === inst || secCode.includes(inst);
+      return pats.some((inst) => secCode === inst || secCode.includes(inst));
     });
   }
   return result;

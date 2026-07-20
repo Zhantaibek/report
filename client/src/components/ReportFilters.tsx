@@ -64,7 +64,7 @@ export default function ReportFilters({ filters, onChange, disabled, singleDate 
         <Label>Инструмент</Label>
         <Input
           placeholder="Фильтр по инструменту"
-          value={filters.instrument ?? ''}
+          value={Array.isArray(filters.instrument) ? filters.instrument.join(', ') : (filters.instrument ?? '')}
           onChange={(e) => onChange({ ...filters, instrument: e.target.value || undefined })}
           className="w-full"
           disabled={disabled}

@@ -5,14 +5,15 @@ import { queryPostgres, QuikConnectionError } from './postgres.js';
 import { queryMssql } from './mssql.js';
 import { queryMysql } from './mysql.js';
 import type { DataSourceType } from '../config/data-sources.js';
+import { normalizeFilterValues } from '../reports/filters.js';
 
 export interface TradeFilters {
   dateFrom?: string;
   dateTo?: string;
   brokerId?: number;
-  firmCode?: string;
-  instrument?: string;
-  classCode?: string;
+  firmCode?: string | string[];
+  instrument?: string | string[];
+  classCode?: string | string[];
 }
 
 export interface FirmItem {
@@ -51,15 +52,15 @@ export async function runCustomSqlQuery(
     database: string;
   };
 
-  // $1=dateFrom, $2=dateTo, $3=classCode, $4=instrument, $5=firmCode
+  // $1=dateFrom, $2=dateTo, $3=classCode[], $4=instrument[], $5=firmCode[]
   // Передаём ровно столько параметров, сколько есть $N в SQL (иначе pg: "supplies 5, requires 4").
   const defaultDate = new Date().toISOString().slice(0, 10);
-  const allParams: (string | null)[] = [
+  const allParams: (string | string[] | null)[] = [
     filters?.dateFrom ?? defaultDate,
     filters?.dateTo ?? filters?.dateFrom ?? defaultDate,
-    filters?.classCode?.trim() || null,
-    filters?.instrument?.trim() || null,
-    filters?.firmCode?.trim() || null,
+    normalizeFilterValues(filters?.classCode) ?? null,
+    normalizeFilterValues(filters?.instrument) ?? null,
+    normalizeFilterValues(filters?.firmCode) ?? null,
   ];
   const paramIndexes = [...customSql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1]));
   const maxParam = paramIndexes.length > 0 ? Math.max(...paramIndexes) : 0;
@@ -152,15 +153,16 @@ function applyFiltersInMemory(trades: Trade[], filters: TradeFilters): Trade[] {
   if (filters.brokerId != null) {
     result = result.filter((t) => Number(t.brokerId) === filters.brokerId || t.brokerCode === String(filters.brokerId));
   }
-  if (filters.firmCode) {
-    const fc = filters.firmCode;
-    result = result.filter((t) => String(t.brokerCode ?? '') === fc);
+  const firmCodes = normalizeFilterValues(filters.firmCode);
+  if (firmCodes) {
+    result = result.filter((t) => firmCodes.includes(String(t.brokerCode ?? '')));
   }
-  if (filters.instrument) {
-    const instrument = filters.instrument.toLowerCase();
+  const instruments = normalizeFilterValues(filters.instrument);
+  if (instruments) {
+    const pats = instruments.map((i) => i.toLowerCase());
     result = result.filter((t) => {
       const secCode = String((t as any).secCode ?? t.instrument ?? '').toLowerCase();
-      return secCode.includes(instrument);
+      return pats.some((instrument) => secCode.includes(instrument));
     });
   }
   return result;

@@ -16,14 +16,16 @@ function normalizeReportCode(code: string): string {
   return code.trim().toLowerCase();
 }
 
-/** $3 — ClassCode, $4 — SecCode (ILIKE), $5 — FirmId, NULL = без фильтра. */
-const TRADES_CLASS_FILTER = '($3::text IS NULL OR t."ClassCode" = $3)';
-const TRADES_INSTRUMENT_FILTER = '($4::text IS NULL OR t."SecCode" ILIKE \'%\' || $4 || \'%\')';
-const TRADES_FIRM_FILTER = '($5::text IS NULL OR t."FirmId"::text = $5)';
+/** $3 — ClassCode[], $4 — SecCode[] (ILIKE any), $5 — FirmId[], NULL = без фильтра. */
+const TRADES_CLASS_FILTER = '($3::text[] IS NULL OR t."ClassCode" = ANY($3))';
+const TRADES_INSTRUMENT_FILTER =
+  '($4::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($4::text[]) AS pat WHERE t."SecCode" ILIKE \'%\' || pat || \'%\'))';
+const TRADES_FIRM_FILTER = '($5::text[] IS NULL OR t."FirmId"::text = ANY($5))';
 const TRADES_OPTIONAL_FILTERS = `${TRADES_CLASS_FILTER}\n    AND ${TRADES_INSTRUMENT_FILTER}`;
 const TRADES_OPTIONAL_FILTERS_WITH_FIRM = `${TRADES_OPTIONAL_FILTERS}\n    AND ${TRADES_FIRM_FILTER}`;
-const SEC_CLASS_FILTER = '($3::text IS NULL OR sec."ClassCode" = $3)';
-const SEC_INSTRUMENT_FILTER = '($4::text IS NULL OR sec."SecCode" ILIKE \'%\' || $4 || \'%\')';
+const SEC_CLASS_FILTER = '($3::text[] IS NULL OR sec."ClassCode" = ANY($3))';
+const SEC_INSTRUMENT_FILTER =
+  '($4::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($4::text[]) AS pat WHERE sec."SecCode" ILIKE \'%\' || pat || \'%\'))';
 
 /**
  * CTE: одна строка на TradeNum для ноги сделки.
@@ -770,9 +772,9 @@ orders_dedup AS (
     o."FirmId"
   FROM "Orders" o
   WHERE o."TradeDate"::date BETWEEN $1::date AND COALESCE($2::date, $1::date)
-    AND ($3::text IS NULL OR o."ClassCode" = $3)
-    AND ($4::text IS NULL OR o."SecCode" ILIKE '%' || $4 || '%')
-    AND ($5::text IS NULL OR o."FirmId"::text = $5)
+    AND ($3::text[] IS NULL OR o."ClassCode" = ANY($3))
+    AND ($4::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($4::text[]) AS pat WHERE o."SecCode" ILIKE '%' || pat || '%'))
+    AND ($5::text[] IS NULL OR o."FirmId"::text = ANY($5))
   ORDER BY o."OrderNum", o."OrderDateTime" DESC
 ),
 ${cteSecuritiesDedup()}
@@ -856,8 +858,8 @@ SELECT
 FROM securities_dedup sec
 LEFT JOIN classes_dedup cl ON cl."ClassCode" = sec."ClassCode"
 LEFT JOIN latest_prices lp ON lp."SecCode" = sec."SecCode"
-WHERE ($3::text IS NULL OR sec."ClassCode" = $3)
-  AND ($4::text IS NULL OR sec."SecCode" ILIKE '%' || $4 || '%')
+WHERE ($3::text[] IS NULL OR sec."ClassCode" = ANY($3))
+  AND ($4::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($4::text[]) AS pat WHERE sec."SecCode" ILIKE '%' || pat || '%'))
 ORDER BY sec."ClassCode", sec."SecFullName"
 `.trim();
 

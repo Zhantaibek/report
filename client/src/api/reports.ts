@@ -4,9 +4,17 @@ export interface RunFilters {
   dateFrom?: string;
   dateTo?: string;
   brokerId?: number;
-  firmCode?: string;
-  instrument?: string;
-  classCode?: string;
+  /** Одно или несколько значений (мультивыбор в UI). */
+  firmCode?: string | string[];
+  instrument?: string | string[];
+  classCode?: string | string[];
+}
+
+/** Нормализация фильтра к массиву непустых строк. */
+export function normalizeFilterValues(v?: string | string[] | null): string[] | undefined {
+  if (v == null) return undefined;
+  const list = (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).filter(Boolean);
+  return list.length > 0 ? list : undefined;
 }
 
 export interface FirmItem {

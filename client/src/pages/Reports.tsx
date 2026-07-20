@@ -10,7 +10,7 @@ import {
   type SavedReportRun,
 } from '../lib/report-run-history.ts';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
+import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, normalizeFilterValues, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -282,9 +282,12 @@ function buildRunSummary(
       parts.push(`${formatRunDate(filters.dateFrom)} – ${formatRunDate(filters.dateTo)}`);
     }
   }
-  if (filters.classCode) parts.push(`класс: ${filters.classCode}`);
-  if (filters.instrument) parts.push(`инстр.: ${filters.instrument}`);
-  if (filters.firmCode) parts.push(`участн.: ${filters.firmCode}`);
+  const classCodes = normalizeFilterValues(filters.classCode);
+  const instruments = normalizeFilterValues(filters.instrument);
+  const firmCodes = normalizeFilterValues(filters.firmCode);
+  if (classCodes) parts.push(`класс: ${classCodes.join(', ')}`);
+  if (instruments) parts.push(`инстр.: ${instruments.join(', ')}`);
+  if (firmCodes) parts.push(`участн.: ${firmCodes.join(', ')}`);
   if (selectedOwnId != null) {
     const inv = oracleInstruments?.find((i) => i.id === selectedOwnId);
     if (inv) parts.push(inv.extcode || inv.namerus);
@@ -357,11 +360,11 @@ export default function Reports() {
       dateTo: entry.filters.dateTo,
     };
     if (mode === 'quik') {
-      restored.classCode = entry.filters.classCode;
-      restored.instrument = entry.filters.instrument;
-      restored.firmCode = entry.filters.firmCode;
+      restored.classCode = normalizeFilterValues(entry.filters.classCode);
+      restored.instrument = normalizeFilterValues(entry.filters.instrument);
+      restored.firmCode = normalizeFilterValues(entry.filters.firmCode);
     } else if (mode === 'firm') {
-      restored.firmCode = entry.filters.firmCode;
+      restored.firmCode = normalizeFilterValues(entry.filters.firmCode);
     }
     return restored;
   }, [forms]);
@@ -1383,22 +1386,32 @@ export default function Reports() {
                     Класс
                   </label>
                   <SelectWithSearch
-                    value={filters.classCode ?? '0'}
-                    onValueChange={(v) => {
-                      const classCode = v === '0' ? undefined : v;
-                      setFilters({ ...filters, classCode, instrument: undefined });
+                    multiple
+                    values={normalizeFilterValues(filters.classCode) ?? []}
+                    onValuesChange={(vals) => {
+                      const classCode = vals.length ? vals : undefined;
+                      const selectedClasses = classCode?.map((c) => c.toLowerCase());
+                      const currentInstruments = normalizeFilterValues(filters.instrument);
+                      let instrument = currentInstruments;
+                      if (selectedClasses && currentInstruments) {
+                        const allowed = new Set(
+                          securities
+                            .filter((s) => selectedClasses.includes(s.classCode.toLowerCase()))
+                            .map((s) => s.secCode),
+                        );
+                        const next = currentInstruments.filter((i) => allowed.has(i));
+                        instrument = next.length ? next : undefined;
+                      }
+                      setFilters({ ...filters, classCode, instrument });
                     }}
                     disabled={!selectedFormId}
                     placeholder="— все классы —"
                     searchFields={['label', 'value']}
-                    triggerClassName={filters.classCode ? FILTER_ACTIVE_TRIGGER : undefined}
-                    options={[
-                      { value: '0', label: '— все классы —' },
-                      ...classes.map((c) => ({
-                        value: c.code,
-                        label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
-                      })),
-                    ]}
+                    triggerClassName={normalizeFilterValues(filters.classCode) ? FILTER_ACTIVE_TRIGGER : undefined}
+                    options={classes.map((c) => ({
+                      value: c.code,
+                      label: c.name !== c.code ? `${c.code} — ${c.name}` : c.code,
+                    }))}
                   />
                 </div>
               )}
@@ -1410,19 +1423,17 @@ export default function Reports() {
                     Участник
                   </label>
                   <SelectWithSearch
-                    value={filters.firmCode ?? '0'}
-                    onValueChange={(v) => setFilters({ ...filters, firmCode: v && v !== '0' ? v : undefined })}
+                    multiple
+                    values={normalizeFilterValues(filters.firmCode) ?? []}
+                    onValuesChange={(vals) => setFilters({ ...filters, firmCode: vals.length ? vals : undefined })}
                     disabled={!selectedFormId}
                     placeholder="— все участники —"
                     searchFields={['label', 'value']}
-                    triggerClassName={filters.firmCode ? FILTER_ACTIVE_TRIGGER : undefined}
-                    options={[
-                      { value: '0', label: '— все участники —' },
-                      ...firms.map((f) => ({
-                        value: f.firmId,
-                        label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
-                      })),
-                    ]}
+                    triggerClassName={normalizeFilterValues(filters.firmCode) ? FILTER_ACTIVE_TRIGGER : undefined}
+                    options={firms.map((f) => ({
+                      value: f.firmId,
+                      label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
+                    }))}
                   />
                 </div>
               )}
@@ -1435,23 +1446,26 @@ export default function Reports() {
                       Инструмент
                     </label>
                     <SelectWithSearch
-                      value={filters.instrument ?? '0'}
-                      onValueChange={(v) => setFilters({ ...filters, instrument: v === '0' ? undefined : v })}
+                      multiple
+                      values={normalizeFilterValues(filters.instrument) ?? []}
+                      onValuesChange={(vals) => setFilters({ ...filters, instrument: vals.length ? vals : undefined })}
                       disabled={!selectedFormId}
                       placeholder="— все инструменты —"
                       searchFields={['label', 'value']}
-                      triggerClassName={filters.instrument ? FILTER_ACTIVE_TRIGGER : undefined}
-                      options={[
-                        { value: '0', label: '— все инструменты —' },
-                        ...securities
-                          .filter((s) => !filters.classCode || s.classCode.toLowerCase() === filters.classCode!.toLowerCase())
-                          .map((s) => ({
-                            value: s.secCode,
-                            label: s.secFullName && s.secFullName !== s.secCode
-                              ? `${s.secCode} — ${s.secFullName}`
-                              : s.secCode,
-                          })),
-                      ]}
+                      triggerClassName={normalizeFilterValues(filters.instrument) ? FILTER_ACTIVE_TRIGGER : undefined}
+                      options={securities
+                        .filter((s) => {
+                          const classCodes = normalizeFilterValues(filters.classCode);
+                          if (!classCodes) return true;
+                          const set = new Set(classCodes.map((c) => c.toLowerCase()));
+                          return set.has(s.classCode.toLowerCase());
+                        })
+                        .map((s) => ({
+                          value: s.secCode,
+                          label: s.secFullName && s.secFullName !== s.secCode
+                            ? `${s.secCode} — ${s.secFullName}`
+                            : s.secCode,
+                        }))}
                     />
                   </div>
 
@@ -1460,19 +1474,17 @@ export default function Reports() {
                       Участник
                     </label>
                     <SelectWithSearch
-                      value={filters.firmCode ?? '0'}
-                      onValueChange={(v) => setFilters({ ...filters, firmCode: v && v !== '0' ? v : undefined })}
+                      multiple
+                      values={normalizeFilterValues(filters.firmCode) ?? []}
+                      onValuesChange={(vals) => setFilters({ ...filters, firmCode: vals.length ? vals : undefined })}
                       disabled={!selectedFormId}
                       placeholder="— все участники —"
                       searchFields={['label', 'value']}
-                      triggerClassName={filters.firmCode ? FILTER_ACTIVE_TRIGGER : undefined}
-                      options={[
-                        { value: '0', label: '— все участники —' },
-                        ...firms.map((f) => ({
-                          value: f.firmId,
-                          label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
-                        })),
-                      ]}
+                      triggerClassName={normalizeFilterValues(filters.firmCode) ? FILTER_ACTIVE_TRIGGER : undefined}
+                      options={firms.map((f) => ({
+                        value: f.firmId,
+                        label: f.firmName && f.firmName !== f.firmId ? `${f.firmName} (${f.firmId})` : f.firmId,
+                      }))}
                     />
                   </div>
                 </>

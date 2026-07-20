@@ -50,9 +50,9 @@ export interface RunReportParams {
     dateFrom?: string;
     dateTo?: string;
     brokerId?: number;
-    firmCode?: string;
-    instrument?: string;
-    classCode?: string;
+    firmCode?: string | string[];
+    instrument?: string | string[];
+    classCode?: string | string[];
   };
   page?: number;
   limit?: number;
