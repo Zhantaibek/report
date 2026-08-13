@@ -1177,9 +1177,13 @@ export default function Reports() {
       return (
         <>
           {tableRows.slice(start, end).map((row, idx) => {
+            const isExchangeContract =
+              code === 'Exchange_Contract' || code === 'Auction_Exchange_Contract';
             const base = {
               id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
-              tradeDate: String(row.tradeDate ?? ''),
+              tradeDate: String(
+                (isExchangeContract ? (row.conclusionDate ?? row.tradeDate) : row.tradeDate) ?? '',
+              ),
               tradeDateTime: row.tradeDateTime != null ? String(row.tradeDateTime) : null,
               classCode: String(row.classCode ?? ''),
               className: row.className != null ? String(row.className) : undefined,
@@ -1200,7 +1204,7 @@ export default function Reports() {
               buyerCommission: row.buyerCommission != null ? Number(row.buyerCommission) : null,
             };
             const cls = idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page';
-            if (code === 'Exchange_Contract' || code === 'Auction_Exchange_Contract') {
+            if (isExchangeContract) {
               return (
                 <div key={`exchange-contract-${row.id ?? idx}-${page}`} className={cls}>
                   <ExchangeContractReport data={base as ExchangeContractData} showDealNumber={showDealNumber} />

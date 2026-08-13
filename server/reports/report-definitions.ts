@@ -112,6 +112,26 @@ function cteMatchedTrades(alias = 'matched_trades'): string {
 )`;
 }
 
+/** Дата T+N рабочих дней по SettleCode (T0/T1/T2). Сб/Вс пропускаются. */
+function sqlSettleBusinessDate(dateExpr: string, settleCodeExpr: string): string {
+  const n = `COALESCE(NULLIF(regexp_replace(COALESCE(${settleCodeExpr}, 'T0'), '[^0-9]', '', 'g'), ''), '0')::int`;
+  return `(
+    SELECT x.d
+    FROM (
+      SELECT gs::date AS d,
+             row_number() OVER (ORDER BY gs) - 1 AS rn
+      FROM generate_series(
+        (${dateExpr})::date,
+        (${dateExpr})::date + ((${n}) * 2 + 10),
+        interval '1 day'
+      ) AS gs
+      WHERE EXTRACT(ISODOW FROM gs) BETWEEN 1 AND 5
+    ) x
+    WHERE x.rn = (${n})
+    LIMIT 1
+  )`;
+}
+
 const TRADES_DATE_BETWEEN = 't."TradeDate" BETWEEN $1 AND $2';
 const TRADES_DATE_BETWEEN_COALESCE = 't."TradeDate" BETWEEN $1 AND COALESCE($2, $1)';
 const TRADES_DATE_BETWEEN_COALESCE_DATE = 't."TradeDate" BETWEEN $1::date AND COALESCE($2::date, $1::date)';
@@ -525,6 +545,8 @@ ${cteSecuritiesDedup()}
 SELECT DISTINCT ON (b."TradeNum")
   b."TradeNum" AS "id",
   to_char(b."TradeDate", 'YYYY-MM-DD') AS "tradeDate",
+  to_char(${sqlSettleBusinessDate('b."TradeDate"', 'b."SettleCode"')}, 'YYYY-MM-DD') AS "conclusionDate",
+  b."SettleCode" AS "settleCode",
   to_char(b."TradeDateTime", 'HH24:MI:SS') AS "tradeDateTime",
   b."ClassCode" AS "classCode",
   COALESCE(cl."ClassName", b."ClassCode") AS "className",
