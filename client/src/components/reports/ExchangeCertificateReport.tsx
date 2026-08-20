@@ -88,7 +88,9 @@ function OneCertificate({
 }) {
   const tradeDate = data.tradeDate ?? '';
   const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
-  const couponVal = data.couponRate != null ? `${fmtNum(data.couponRate, 0)} %` : '—';
+  const couponVal = data.couponRate != null
+    ? `${fmtNum(data.couponRate, 2)} %`
+    : '—';
   const yieldVal = data.yield != null ? `${fmtNum(data.yield, 2)} %` : '%';
   const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
   const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';

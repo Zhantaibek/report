@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Percent, Coins, Layers, Building2, Users, Mail, Calculator } from 'lucide-react';
+import { Percent, Coins, Layers, Building2, Users, Mail, Calculator, UserCircle } from 'lucide-react';
 
 const TABS = [
   { to: '/admin/reference/tariffs', label: 'Тарифы', icon: Percent },
@@ -7,6 +7,7 @@ const TABS = [
   { to: '/admin/reference/trade-classes', label: 'Классификация рынка', icon: Layers },
   { to: '/admin/reference/emitents', label: 'Эмитенты', icon: Building2 },
   { to: '/admin/reference/brokers', label: 'Брокеры', icon: Users },
+  { to: '/admin/reference/users', label: 'Пользователи', icon: UserCircle },
   { to: '/admin/reference/email-reports', label: 'Рассылка', icon: Mail },
   { to: '/admin/reference/calculator', label: 'Калькулятор', icon: Calculator },
 ] as const;

@@ -83,7 +83,8 @@ function cteSecuritiesDedup(alias = 'securities_dedup'): string {
     MAX(NULLIF(TRIM(s."SecFullName"), '')) AS "SecFullName",
     MAX(NULLIF(TRIM(s."ISINCode"), '')) AS "ISINCode",
     MAX(s."ClassCode") AS "ClassCode",
-    MAX(s."FaceValue") AS "FaceValue"
+    MAX(s."FaceValue") AS "FaceValue",
+    MAX(s."CouponValue") AS "CouponValue"
   FROM "Securities" s
   GROUP BY s."SecCode"
 )`;
@@ -558,15 +559,17 @@ SELECT DISTINCT ON (b."TradeNum")
   COALESCE(NULLIF(TRIM(sf."FirmName"), ''), NULLIF(TRIM(s."FirmName"), '')) AS "sellerName",
   s."Account" AS "sellAccount",
   NULLIF(TRIM(s."ClientCode"), '') AS "sellerClientCode",
+  s."UID" AS "sellerUid",
   COALESCE(NULLIF(TRIM(bf."FirmName"), ''), NULLIF(TRIM(b."FirmName"), '')) AS "buyerName",
   b."Account" AS "buyAccount",
   NULLIF(TRIM(b."ClientCode"), '') AS "buyerClientCode",
+  b."UID" AS "buyerUid",
   b."Qty" AS "quantity",
   b."Price" AS "price",
   b."Value" AS "value",
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   b."Yield" AS "yield",
-  NULL::numeric AS "couponRate"
+  sec."CouponValue" AS "couponRate"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"

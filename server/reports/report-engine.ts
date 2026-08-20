@@ -10,6 +10,7 @@ import { getReportDefinition, getSqlForReport } from './report-definitions.js';
 import { getReportFormById } from '../db/repositories/reportForms.js';
 import { calculateCommissionForTrade } from './commission-engine.js';
 import { loadTradeClassRulesMap, resolveMarketTypeSync, buildMarketRulesSqlCte } from './market-type.js';
+import { getAllQuikUsers, formatQuikUserName } from '../db/repositories/quikUsers.js';
 
 /** Агрегированные отчёты: не дедуплицируем по id (иначе схлопываются строки). */
 const AGGREGATED_REPORT_CODES = new Set([
@@ -26,6 +27,39 @@ const AGGREGATED_REPORT_CODES = new Set([
   'Blank_Form_06',
   'StateHolding_Form5_Top5',
 ]);
+
+const EXCHANGE_TRADER_CODES = new Set([
+  'Exchange_Contract',
+  'Auction_Exchange_Contract',
+  'Exchange_Certificate',
+  'Auction_Exchange_Certificate',
+]);
+
+async function attachTradersFromQuikUsers(rows: Trade[]): Promise<Trade[]> {
+  if (rows.length === 0) return rows;
+  const users = await getAllQuikUsers();
+  const byUid = new Map<number, string>();
+  for (const u of users) {
+    byUid.set(Number(u.uid), formatQuikUserName(u));
+  }
+  return rows.map((trade) => {
+    const t = trade as Trade & {
+      sellerUid?: unknown;
+      buyerUid?: unknown;
+      sellerClientCode?: unknown;
+      buyerClientCode?: unknown;
+    };
+    const sellerUid = Number(t.sellerUid);
+    const buyerUid = Number(t.buyerUid);
+    const sellerTrader = Number.isFinite(sellerUid) ? byUid.get(sellerUid) : undefined;
+    const buyerTrader = Number.isFinite(buyerUid) ? byUid.get(buyerUid) : undefined;
+    return {
+      ...trade,
+      sellerClientCode: sellerTrader || t.sellerClientCode || null,
+      buyerClientCode: buyerTrader || t.buyerClientCode || null,
+    } as Trade;
+  });
+}
 
 export async function runReport(params: RunReportParams): Promise<ReportResult> {
   const { reportFormId, dataSourceIds = [], filters } = params;
@@ -97,6 +131,9 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     uniqueTrades = Array.from(uniqueTradesMap.values());
   }
 
+  if (EXCHANGE_TRADER_CODES.has(form.code)) {
+    uniqueTrades = await attachTradersFromQuikUsers(uniqueTrades);
+  }
 
   // Обогащаем сделки типом рынка и комиссиями
   const marketRules = await loadTradeClassRulesMap();

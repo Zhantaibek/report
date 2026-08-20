@@ -181,6 +181,29 @@ CREATE TABLE IF NOT EXISTS brokers (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokers_email ON brokers(LOWER(email));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brokers_firm_id ON brokers(firm_id) WHERE firm_id IS NOT NULL AND firm_id <> '';
 
+-- Пользователи QUIK (справочник, импорт из Excel)
+CREATE TABLE IF NOT EXISTS quik_users (
+  id SERIAL PRIMARY KEY,
+  uid INTEGER NOT NULL UNIQUE,
+  last_name TEXT,
+  first_name TEXT,
+  patronymic TEXT,
+  login TEXT,
+  date_from DATE,
+  date_to DATE,
+  org_code TEXT,
+  org_name TEXT,
+  blocked BOOLEAN NOT NULL DEFAULT FALSE,
+  comment TEXT,
+  is_service BOOLEAN NOT NULL DEFAULT FALSE,
+  main_uid INTEGER,
+  last_login TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_quik_users_login ON quik_users(login);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_quik_users_login_unique ON quik_users (LOWER(login)) WHERE login IS NOT NULL AND btrim(login) <> '';
+CREATE INDEX IF NOT EXISTS idx_quik_users_org_code ON quik_users(org_code);
+
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns

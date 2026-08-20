@@ -13,6 +13,7 @@ import CurrencyRates from './pages/admin/CurrencyRates.tsx';
 import TradeClasses from './pages/admin/TradeClasses.tsx';
 import Emitents from './pages/admin/Emitents.tsx';
 import Brokers from './pages/admin/Brokers.tsx';
+import QuikUsers from './pages/admin/QuikUsers.tsx';
 import EmailReports from './pages/admin/EmailReports.tsx';
 import Calculator from './pages/admin/Calculator.tsx';
 import Profile from './pages/Profile.tsx';
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="trade-classes" element={<TradeClasses />} />
           <Route path="emitents" element={<Emitents />} />
           <Route path="brokers" element={<Brokers />} />
+          <Route path="users" element={<QuikUsers />} />
           <Route path="email-reports" element={<EmailReports />} />
           <Route path="calculator" element={<Calculator />} />
         </Route>

@@ -155,7 +155,8 @@ const FORM_META: Record<string, FormMeta> = {
 };
 
 /** Подсветка селекта, когда выбрано конкретное значение (не «все»). */
-const FILTER_ACTIVE_TRIGGER = 'border-emerald-300 bg-emerald-50';
+const FILTER_ACTIVE_TRIGGER =
+  'border-emerald-300 bg-emerald-50 text-foreground dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100';
 
 /** Все формы с собственным шаблоном (не generic-таблица); для них доступна печать. */
 const FORMS_WITH_CUSTOM_VIEW = new Set(Object.keys(FORM_META));
@@ -1352,7 +1353,9 @@ export default function Reports() {
                       return {
                         value: String(form.id),
                         label: (form.description || form.name || '').trim(),
-                        className: isOracle ? 'bg-amber-50 hover:bg-amber-100' : undefined,
+                        className: isOracle
+                          ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60'
+                          : undefined,
                       };
                     }),
                   }))}

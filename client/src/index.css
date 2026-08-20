@@ -27,6 +27,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 186 30% 8%;
     --foreground: 186 15% 90%;
     --card: 186 25% 12%;

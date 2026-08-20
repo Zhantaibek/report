@@ -10,6 +10,7 @@ import commissionTariffsRoutes from './commission-tariffs.routes.js';
 import tradeClassRulesRoutes from './trade-class-rules.routes.js';
 import emitentsRoutes from './emitents.routes.js';
 import brokersRoutes from './brokers.routes.js';
+import quikUsersRoutes from './quik-users.routes.js';
 import emailReportsRoutes from './email-reports.routes.js';
 import adminRoutes from './admin.routes.js';
 // TEMP: открытый /api/instruments — удалить после использования
@@ -28,6 +29,7 @@ api.use('/commission-tariffs', commissionTariffsRoutes);
 api.use('/trade-class-rules', tradeClassRulesRoutes);
 api.use('/emitents', emitentsRoutes);
 api.use('/brokers', brokersRoutes);
+api.use('/quik-users', quikUsersRoutes);
 api.use('/email-reports', emailReportsRoutes);
 api.use('/admin', adminRoutes);
 // TEMP: открытый эндпоинт инструментов Oracle
