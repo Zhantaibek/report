@@ -84,7 +84,8 @@ function cteSecuritiesDedup(alias = 'securities_dedup'): string {
     MAX(NULLIF(TRIM(s."ISINCode"), '')) AS "ISINCode",
     MAX(s."ClassCode") AS "ClassCode",
     MAX(s."FaceValue") AS "FaceValue",
-    MAX(s."CouponValue") AS "CouponValue"
+    MAX(s."CouponValue") AS "CouponValue",
+    MAX(s."CouponPeriod") AS "CouponPeriod"
   FROM "Securities" s
   GROUP BY s."SecCode"
 )`;
@@ -569,7 +570,7 @@ SELECT DISTINCT ON (b."TradeNum")
   b."Value" AS "value",
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   b."Yield" AS "yield",
-  sec."CouponValue" AS "couponRate"
+  ROUND(365.0 / NULLIF(sec."CouponPeriod", 0)) * sec."CouponValue" AS "couponRate"
 FROM buy_trades b
 JOIN sell_trades s ON b."TradeNum" = s."TradeNum"
 LEFT JOIN firms_dedup bf ON bf."FirmId" = b."FirmId"
