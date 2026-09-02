@@ -131,6 +131,40 @@ export async function queryOracleUsd(
   }));
 }
 
+export interface UsdForm2DealRow {
+  serial: number;
+  trade_date: string;
+  quantity: number;
+  price: number;
+  value: number;
+  ownid: number;
+  issuer_namerus?: string | null;
+  sec_extcode?: string | null;
+}
+
+export async function queryOracleUsdForm2(
+  dateFrom: string,
+  dateTo: string,
+  ownId?: number,
+): Promise<UsdForm2DealRow[]> {
+  const raw = await runJavaBridge(
+    'OracleForm2Query',
+    ownId !== undefined ? [dateFrom, dateTo, String(ownId)] : [dateFrom, dateTo],
+    { maxBuffer: 16 * 1024 * 1024, timeout: 60000 },
+  );
+  const rows = JSON.parse(raw) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    serial:     Number(r.serial     ?? 0),
+    trade_date: String(r.trade_date ?? ''),
+    quantity:   Number(r.quantity   ?? 0),
+    price:      Number(r.price      ?? 0),
+    value:      Number(r.value      ?? 0),
+    ownid:      Number(r.ownid      ?? 0),
+    issuer_namerus: r.issuer_namerus != null ? String(r.issuer_namerus) : null,
+    sec_extcode:    r.sec_extcode != null ? String(r.sec_extcode) : null,
+  }));
+}
+
 export interface GoldContractRow {
   serial: number;
   trade_date: string;

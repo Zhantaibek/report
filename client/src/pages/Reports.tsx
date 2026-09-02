@@ -10,7 +10,7 @@ import {
   type SavedReportRun,
 } from '../lib/report-run-history.ts';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, normalizeFilterValues, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
+import { runReport, runUsdReport, runUsdForm2Report, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, normalizeFilterValues, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -22,6 +22,7 @@ import Form2Report, {
   type ReportTradesForm2Data,
   type ClassGroupForm2,
 } from '../components/reports/Form2Report.tsx';
+import Form2UsdReport, { buildForm2UsdData } from '../components/reports/Form2UsdReport.tsx';
 import Form4Report, {
   type ReportTradesForm4Data,
   type ClassGroupForm4,
@@ -86,9 +87,10 @@ import { Alert, AlertDescription } from '../components/ui/alert.tsx';
  * Источник данных формы:
  *   quik   — основная БД (Postgres/MSSQL)
  *   usd    — Oracle отчёт по USD (runUsdReport)
+ *   usd_form2 — Oracle Форма 2 USD (runUsdForm2Report)
  *   gold   — Oracle отчёт по золоту (runGoldReport)
  */
-type FormDataSource = 'quik' | 'usd' | 'gold';
+type FormDataSource = 'quik' | 'usd' | 'usd_form2' | 'gold';
 
 /**
  * Режим фильтров в панели:
@@ -129,6 +131,7 @@ const FORM_META: Record<string, FormMeta> = {
   Orders_Summary: { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Trades_By_Sec:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Blank_Form_USD: { customView: true, dataSource: 'usd',  filterMode: 'oracle' },
+  Blank_Form_2_USD: { customView: true, dataSource: 'usd_form2', filterMode: 'oracle' },
 
   // ── Аукцион ───────────────────────────────────────────────────────────────
   Auction_Summary:              { customView: true, dataSource: 'quik', filterMode: 'quik' },
@@ -413,6 +416,13 @@ export default function Reports() {
         setGoldRows(null);
         return res.rows.length;
       }
+      if (ds === 'usd_form2') {
+        const res = await runUsdForm2Report(runFilters.dateFrom!, runFilters.dateTo!, ownId);
+        setResult({ type: 'table', rows: res.rows, total: res.rows.length });
+        setUsdRows(null);
+        setGoldRows(null);
+        return res.rows.length;
+      }
       if (ds === 'gold') {
         const res = await runGoldReport(runFilters.dateFrom!, runFilters.dateTo!, ownId);
         setGoldRows(res.rows);
@@ -633,6 +643,8 @@ export default function Reports() {
 
     if (code === 'Gold_Daily_Summary' && goldRows?.length)    return { totalRecords: 1, totalPages: 1 };
     if (code === 'Exchange_Contract_Gold' && goldRows?.length) return onePerPage(goldRows.length);
+    if (code === 'Blank_Form_2_USD' && result?.type === 'table' && result.rows.length)
+      return { totalRecords: 1, totalPages: 1 };
     if (!result || result.type !== 'table' || result.rows.length === 0) return null;
 
     const rows = result.rows as Record<string, unknown>[];
@@ -749,6 +761,26 @@ export default function Reports() {
             data={{ periodFrom: dateFrom, periodTo: dateTo, classes: groupByClassAndSecForm2(pagedRows), totalSummary: { totalQuantity, totalAmount } }}
             showTotalSummary={isPrinting || page === totalPages}
           />
+        </div>
+      );
+    }
+
+    // ── Blank_Form_2_USD (Oracle) ───────────────────────────────────────────
+    if (code === 'Blank_Form_2_USD') {
+      if (tableRows == null) return null;
+      if (!tableRows.length) {
+        return (
+          <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
+            <p className="text-base font-semibold text-foreground">Данные не найдены</p>
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm">
+              За выбранный период сделок USD в Oracle не найдено.
+            </p>
+          </div>
+        );
+      }
+      return (
+        <div className="mt-6">
+          <Form2UsdReport data={buildForm2UsdData(tableRows, dateFrom, dateTo)} />
         </div>
       );
     }
@@ -1349,6 +1381,7 @@ export default function Reports() {
                         : <FileText className="mr-2 h-4 w-4 shrink-0 opacity-70" />,
                     options: categoryForms.map((form) => {
                       const isOracle = FORM_META[form.code]?.dataSource === 'usd'
+                        || FORM_META[form.code]?.dataSource === 'usd_form2'
                         || FORM_META[form.code]?.dataSource === 'gold';
                       return {
                         value: String(form.id),

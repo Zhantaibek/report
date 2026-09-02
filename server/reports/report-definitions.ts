@@ -1126,6 +1126,13 @@ export const reportDefinitions: ReportDefinition[] = [
     category: 'Отчеты по системной информации',
   },
   {
+    code: 'Blank_Form_2_USD',
+    name: 'Blank_Form_2_USD',
+    description: 'Форма 2 USD - Отчет о заключенных сделках',
+    type: 'table',
+    category: 'Отчеты по системной информации',
+  },
+  {
     code: 'StateHolding_Form5_Top5',
     name: 'StateHolding_Form5_Top5',
     description:
