@@ -1,8 +1,9 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx';
 import { Button } from '../components/ui/button.tsx';
 import { SelectWithSearch, type SelectOptionGroup } from '../components/ui/select.tsx';
-import { Play, Printer, RotateCcw, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText, Building2, History } from 'lucide-react';
+import { Play, Printer, RotateCcw, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, BarChart2, FileText, Building2, History, Download, ChevronDown } from 'lucide-react';
+import type { ExportFormat } from '../lib/report-export.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import {
   loadReportRunHistory,
@@ -10,7 +11,7 @@ import {
   type SavedReportRun,
 } from '../lib/report-run-history.ts';
 import { getReportForms } from '../api/report-forms.ts';
-import { runReport, runUsdReport, runUsdForm2Report, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, normalizeFilterValues, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
+import { runReport, runUsdReport, runGoldReport, exportReport, getSecurities, getClasses, getFirms, getOracleInstruments, normalizeFilterValues, type ReportResult, type RunFilters, type SecurityItem, type ClassItem, type FirmItem, type UsdReportRow, type GoldContractRow, type OracleInstrument } from '../api/reports.ts';
 import type { ReportForm } from '../api/report-forms.ts';
 import ReportTable from '../components/ReportTable.tsx';
 import ReportSummary from '../components/ReportSummary.tsx';
@@ -22,7 +23,7 @@ import Form2Report, {
   type ReportTradesForm2Data,
   type ClassGroupForm2,
 } from '../components/reports/Form2Report.tsx';
-import Form2UsdReport, { buildForm2UsdData } from '../components/reports/Form2UsdReport.tsx';
+import Form2UsdReport from '../components/reports/Form2UsdReport.tsx';
 import Form4Report, {
   type ReportTradesForm4Data,
   type ClassGroupForm4,
@@ -79,6 +80,8 @@ import {
 import { UsdReport } from '../components/reports/UsdReport.tsx';
 import { ExchangeContractGold } from '../components/reports/ExchangeContractGold.tsx';
 import { GoldDailySummaryReport } from '../components/reports/GoldDailySummaryReport.tsx';
+import { GoldExchangeContractReport } from '../components/reports/GoldExchangeContractReport.tsx';
+import { GoldSummaryReport } from '../components/reports/GoldSummaryReport.tsx';
 import { ReportPagination } from '../components/reports/ReportPagination.tsx';
 import { DateInput } from '../components/ui/date-input.tsx';
 import { Alert, AlertDescription } from '../components/ui/alert.tsx';
@@ -87,7 +90,7 @@ import { Alert, AlertDescription } from '../components/ui/alert.tsx';
  * Источник данных формы:
  *   quik   — основная БД (Postgres/MSSQL)
  *   usd    — Oracle отчёт по USD (runUsdReport)
- *   usd_form2 — Oracle Форма 2 USD (runUsdForm2Report)
+ *   usd_form2 — Oracle Форма 2 USD (тот же запрос, что Отчет USD)
  *   gold   — Oracle отчёт по золоту (runGoldReport)
  */
 type FormDataSource = 'quik' | 'usd' | 'usd_form2' | 'gold';
@@ -147,6 +150,8 @@ const FORM_META: Record<string, FormMeta> = {
   Exchange_Certificate:  { customView: true, dataSource: 'quik', filterMode: 'quik' },
   Exchange_Contract_Gold:{ customView: true, dataSource: 'gold', filterMode: 'oracle' },
   Gold_Daily_Summary:    { customView: true, dataSource: 'gold', filterMode: 'oracle' },
+  Exchange_Contract_Gold_Quik: { customView: true, dataSource: 'quik', filterMode: 'firm' },
+  Gold_Summary_Quik:           { customView: true, dataSource: 'quik', filterMode: 'none' },
 
   // ── ГосФинНадзор ──────────────────────────────────────────────────────────
   StateHolding_Form5_Top5: { customView: true, dataSource: 'quik', filterMode: 'none' },
@@ -323,7 +328,20 @@ export default function Reports() {
   const [page, setPage] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
   const [recentRuns, setRecentRuns] = useState<SavedReportRun[]>([]);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const reportContentRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const limit = 20;
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [exportMenuOpen]);
 
   useEffect(() => {
     setRecentRuns(loadReportRunHistory(historyUserKey));
@@ -409,19 +427,12 @@ export default function Reports() {
       const form = forms.find((f) => String(f.id) === reportFormId);
       const meta = form ? FORM_META[form.code] : undefined;
       const ds = meta?.dataSource ?? 'quik';
-      if (ds === 'usd') {
+      if (ds === 'usd' || ds === 'usd_form2') {
         const res = await runUsdReport(runFilters.dateFrom!, runFilters.dateTo!, ownId);
         setUsdRows(res.rows);
         setResult(null);
         setGoldRows(null);
-        return res.rows.length;
-      }
-      if (ds === 'usd_form2') {
-        const res = await runUsdForm2Report(runFilters.dateFrom!, runFilters.dateTo!, ownId);
-        setResult({ type: 'table', rows: res.rows, total: res.rows.length });
-        setUsdRows(null);
-        setGoldRows(null);
-        return res.rows.length;
+        return res.rows.reduce((s, r) => s + Number(r.deal_count), 0);
       }
       if (ds === 'gold') {
         const res = await runGoldReport(runFilters.dateFrom!, runFilters.dateTo!, ownId);
@@ -581,6 +592,36 @@ export default function Reports() {
     setTimeout(() => window.print(), 100);
   };
 
+  /** Выгрузка отчёта целиком (все страницы, как при печати) в Excel / Word / PDF. */
+  const handleExport = async (format: ExportFormat) => {
+    setExportMenuOpen(false);
+    if (!selectedForm || exporting) return;
+    setExporting(format);
+    setIsPrinting(true);
+    try {
+      // Даём React отрисовать все страницы отчёта
+      await new Promise((r) => setTimeout(r, 150));
+      const root = reportContentRef.current;
+      if (!root) return;
+      // Библиотеки Excel/Word/PDF тяжёлые — грузим только при выгрузке
+      const { exportReportElement } = await import('../lib/report-export.ts');
+      const title = (selectedForm.description || selectedForm.name || 'Отчёт').trim();
+      const period = filters.dateFrom && filters.dateTo && filters.dateFrom !== filters.dateTo
+        ? `${formatRunDate(filters.dateFrom)}-${formatRunDate(filters.dateTo)}`
+        : formatRunDate(filters.dateFrom);
+      await exportReportElement(root, format, {
+        fileName: period ? `${title} ${period}` : title,
+        landscape: selectedForm.category === 'Отчеты по системной информации',
+      });
+    } catch (err) {
+      console.error(err);
+      setRunError(err instanceof Error ? `Не удалось выгрузить отчёт: ${err.message}` : 'Не удалось выгрузить отчёт');
+    } finally {
+      setIsPrinting(false);
+      setExporting(null);
+    }
+  };
+
   const handleReset = () => {
     setSelectedFormId('');
     setFilters({ dateFrom: undefined, dateTo: undefined });
@@ -643,8 +684,10 @@ export default function Reports() {
 
     if (code === 'Gold_Daily_Summary' && goldRows?.length)    return { totalRecords: 1, totalPages: 1 };
     if (code === 'Exchange_Contract_Gold' && goldRows?.length) return onePerPage(goldRows.length);
-    if (code === 'Blank_Form_2_USD' && result?.type === 'table' && result.rows.length)
-      return { totalRecords: 1, totalPages: 1 };
+    if ((code === 'Blank_Form_2_USD' || code === 'Blank_Form_USD') && usdRows?.length) {
+      const deals = usdRows.reduce((s, r) => s + Number(r.deal_count), 0);
+      return { totalRecords: deals, totalPages: 1 };
+    }
     if (!result || result.type !== 'table' || result.rows.length === 0) return null;
 
     const rows = result.rows as Record<string, unknown>[];
@@ -665,8 +708,8 @@ export default function Reports() {
       return n > 0 ? { totalRecords: n, totalPages: Math.ceil(n / limit) || 0 } : null;
     }
 
-    // Форма 13 — одна сводная страница
-    if (code === 'Blank_Form_13') {
+    // Форма 13 / Сводный отчёт по золоту — одна сводная страница
+    if (code === 'Blank_Form_13' || code === 'Gold_Summary_Quik') {
       return { totalRecords: 1, totalPages: 1 };
     }
 
@@ -716,12 +759,13 @@ export default function Reports() {
       || code === 'Exchange_Certificate'
       || code === 'Auction_Exchange_Contract'
       || code === 'Auction_Exchange_Certificate'
+      || code === 'Exchange_Contract_Gold_Quik'
     )
       return onePerPage(rows.length);
 
     // Стандартная пагинация
     return { totalRecords: result.total, totalPages: Math.ceil(result.total / limit) };
-  }, [result, selectedForm, groupedResult, goldRows, limit]);
+  }, [result, selectedForm, groupedResult, goldRows, usdRows, limit]);
 
   // ── Основная функция рендера для выбранной формы ────────────────────────
   const renderFormContent = () => {
@@ -765,10 +809,10 @@ export default function Reports() {
       );
     }
 
-    // ── Blank_Form_2_USD (Oracle) ───────────────────────────────────────────
+    // ── Blank_Form_2_USD (Oracle, те же данные что Отчет USD) ────────────────
     if (code === 'Blank_Form_2_USD') {
-      if (tableRows == null) return null;
-      if (!tableRows.length) {
+      if (usdRows == null) return null;
+      if (!usdRows.length) {
         return (
           <div className="mt-6 flex flex-col items-center justify-center py-16 text-center print:hidden">
             <p className="text-base font-semibold text-foreground">Данные не найдены</p>
@@ -778,9 +822,15 @@ export default function Reports() {
           </div>
         );
       }
+      const inv = selectedOwnId !== undefined ? oracleInstruments.find((i) => i.id === selectedOwnId) : undefined;
       return (
         <div className="mt-6">
-          <Form2UsdReport data={buildForm2UsdData(tableRows, dateFrom, dateTo)} />
+          <Form2UsdReport
+            rows={usdRows}
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            instrument={inv ? (inv.extcode ? `${inv.extcode} — ${inv.namerus}` : inv.namerus) : undefined}
+          />
         </div>
       );
     }
@@ -1231,6 +1281,7 @@ export default function Reports() {
               quantity: Number(row.quantity ?? 0),
               price: Number(row.price ?? 0),
               value: Number(row.value ?? 0),
+              accruedInt: row.accruedInt != null ? Number(row.accruedInt) : null,
               settleDate: row.settleDate != null ? String(row.settleDate) : null,
               couponRate: row.couponRate != null ? Number(row.couponRate) : null,
               sellerCommission: row.sellerCommission != null ? Number(row.sellerCommission) : null,
@@ -1254,6 +1305,58 @@ export default function Reports() {
             );
           })}
         </>
+      );
+    }
+
+    // ── Биржевой контракт по золоту (QUIK) ─────────────────────────────────
+    if (code === 'Exchange_Contract_Gold_Quik') {
+      if (!tableRows?.length) return null;
+      const start = isPrinting ? 0 : (page - 1);
+      const end   = isPrinting ? tableRows.length : start + 1;
+      return (
+        <>
+          {tableRows.slice(start, end).map((row, idx) => (
+            <div key={`gold-contract-quik-${row.id ?? idx}-${page}`} className={idx === 0 ? 'mt-6' : 'mt-10 print:break-before-page'}>
+              <GoldExchangeContractReport
+                data={{
+                  id: typeof row.id === 'string' || typeof row.id === 'number' ? row.id : String(row.id ?? ''),
+                  tradeDate: String(row.conclusionDate ?? row.tradeDate ?? ''),
+                  tradeDateTime: row.tradeDateTime != null ? String(row.tradeDateTime) : null,
+                  secCode: String(row.secCode ?? ''),
+                  secFullName: row.secFullName != null ? String(row.secFullName) : undefined,
+                  sellerName: row.sellerName != null ? String(row.sellerName) : null,
+                  sellAccount: row.sellAccount != null ? String(row.sellAccount) : null,
+                  sellerTrader: row.sellerClientCode != null ? String(row.sellerClientCode) : null,
+                  buyerName: row.buyerName != null ? String(row.buyerName) : null,
+                  buyAccount: row.buyAccount != null ? String(row.buyAccount) : null,
+                  buyerTrader: row.buyerClientCode != null ? String(row.buyerClientCode) : null,
+                  quantity: Number(row.quantity ?? 0),
+                  price: Number(row.price ?? 0),
+                  value: Number(row.value ?? 0),
+                  settleDate: row.settleDate != null ? String(row.settleDate) : null,
+                  sellerCommission: row.sellerCommission != null ? Number(row.sellerCommission) : null,
+                  buyerCommission: row.buyerCommission != null ? Number(row.buyerCommission) : null,
+                }}
+              />
+            </div>
+          ))}
+        </>
+      );
+    }
+
+    // ── Сводный отчёт по золоту (QUIK) ─────────────────────────────────────
+    if (code === 'Gold_Summary_Quik') {
+      if (!tableRows) return null;
+      return (
+        <GoldSummaryReport
+          reportDate={dateFrom}
+          trades={tableRows.map((row) => ({
+            id: String(row.id ?? ''),
+            secCode: String(row.secCode ?? ''),
+            price: Number(row.price ?? 0),
+            value: Number(row.value ?? 0),
+          }))}
+        />
       );
     }
 
@@ -1594,6 +1697,41 @@ export default function Reports() {
                       <Printer className="h-4 w-4 mr-1.5" />
                       Печать
                     </Button>
+                    <div className="relative" ref={exportMenuRef}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setExportMenuOpen((v) => !v)}
+                        disabled={exporting !== null}
+                        aria-haspopup="menu"
+                        aria-expanded={exportMenuOpen}
+                      >
+                        <Download className="h-4 w-4 mr-1.5" />
+                        {exporting ? 'Выгрузка…' : 'Скачать'}
+                        <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
+                      </Button>
+                      {exportMenuOpen && (
+                        <div
+                          role="menu"
+                          className="absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+                        >
+                          {([
+                            ['xlsx', 'Excel (.xlsx)'],
+                            ['docx', 'Word (.docx)'],
+                            ['pdf', 'PDF (.pdf)'],
+                          ] as const).map(([format, label]) => (
+                            <button
+                              key={format}
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                              onClick={() => handleExport(format)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <Button variant="secondary" onClick={handleReset} disabled={loading}>
                       <RotateCcw className="h-4 w-4 mr-1.5" />
                       Сброс
@@ -1650,7 +1788,7 @@ export default function Reports() {
           {selectedForm && (
             <>
               <div className="border-t border-border mt-2 mb-4 print:hidden" />
-              {renderFormContent()}
+              <div ref={reportContentRef}>{renderFormContent()}</div>
               {/* Общая пагинация снизу — синхронна с верхней */}
               {paginationInfo && (
                 <div className="mt-4 print:hidden">

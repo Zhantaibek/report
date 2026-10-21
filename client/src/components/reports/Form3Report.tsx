@@ -54,6 +54,12 @@ interface Props {
 
 function formatDate(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return '';
+  if (typeof dateStr === 'string') {
+    // Уже «дд/мм/гггг» (так приходит из Reports.tsx) — не разбираем повторно: new Date() прочитал бы как мм/дд
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+    const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  }
   const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
   if (isNaN(d.getTime())) return '';
   const day = String(d.getDate()).padStart(2, '0');
@@ -99,7 +105,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                 Дата заключения
               </th>
               <th className="border border-border px-3 py-2 text-center font-medium">
-                Дата исполнения
+                Дата выпуска
               </th>
               <th className="border border-border px-3 py-2 text-center font-medium w-[18%]">
                 Продавец
@@ -156,7 +162,7 @@ export default function Form3Report({ data, className, showTotalSummary = true }
                                 <tr key={`${pIdx}-${cIdx}-${sIdx}-${tIdx}`} className="hover:bg-muted/20">
                                   <td className="border border-border px-3 py-2 text-center">{trade.id}</td>
                                   <td className="border border-border px-3 py-2 text-center">{formatDate(trade.tradeDate)}</td>
-                                  <td className="border border-border px-3 py-2 text-center">{formatDate(trade.settleDate)}</td>
+                                  <td className="border border-border px-3 py-2 text-center">{formatDate(trade.tradeDate)}</td>
                                   <td className="border border-border px-3 py-2 break-words align-top">{trade.brokerName}</td>
                                   <td className="border border-border px-3 py-2 break-words align-top">{trade.counterpartyName}</td>
                                   <td className="border border-border px-3 py-2 text-right tabular-nums">{formatNumber(trade.price)}</td>

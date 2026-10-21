@@ -33,6 +33,7 @@ const EXCHANGE_TRADER_CODES = new Set([
   'Auction_Exchange_Contract',
   'Exchange_Certificate',
   'Auction_Exchange_Certificate',
+  'Exchange_Contract_Gold_Quik',
 ]);
 
 async function attachTradersFromQuikUsers(rows: Trade[]): Promise<Trade[]> {

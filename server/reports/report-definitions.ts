@@ -568,6 +568,7 @@ SELECT DISTINCT ON (b."TradeNum")
   b."Qty" AS "quantity",
   b."Price" AS "price",
   b."Value" AS "value",
+  COALESCE(b."Accruedint", s."Accruedint", 0) AS "accruedInt",
   to_char(b."SettleDate", 'YYYY-MM-DD') AS "settleDate",
   b."Yield" AS "yield",
   ROUND(365.0 / NULLIF(sec."CouponPeriod", 0)) * sec."CouponValue" AS "couponRate"
@@ -578,6 +579,22 @@ LEFT JOIN firms_dedup sf ON sf."FirmId" = s."FirmId"
 LEFT JOIN classes_dedup cl ON cl."ClassCode" = b."ClassCode"
 LEFT JOIN securities_dedup sec ON sec."SecCode" = b."SecCode"
 ORDER BY b."TradeNum", b."TradeDate" DESC
+`.trim();
+
+/** Класс драгметаллов КФБ в QUIK (сертификаты золотых слитков). */
+const GOLD_CLASS_CODE = 'QME_MTL';
+
+/**
+ * Сделки с золотом из QUIK: те же поля, что у Биржевого контракта, только класс драгметаллов.
+ * Используется Биржевым контрактом по золоту и Сводным отчётом по золоту.
+ */
+const goldTradesQuery = `
+SELECT *
+FROM (
+${exchangeContractQuery}
+) gold
+WHERE gold."classCode" = '${GOLD_CLASS_CODE}'
+ORDER BY gold."tradeDate", gold."id"
 `.trim();
 
 /**
@@ -1277,6 +1294,24 @@ export const reportDefinitions: ReportDefinition[] = [
     type: 'table',
     category: 'Юридические документы',
     singleDate: true,
+  },
+  {
+    code: 'Exchange_Contract_Gold_Quik',
+    name: 'Exchange_Contract_Gold_Quik',
+    description: 'Биржевой контракт по золоту',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+    sql: goldTradesQuery,
+  },
+  {
+    code: 'Gold_Summary_Quik',
+    name: 'Gold_Summary_Quik',
+    description: 'Сводный отчёт по золоту',
+    type: 'table',
+    category: 'Юридические документы',
+    singleDate: true,
+    sql: goldTradesQuery,
   },
 ];
 

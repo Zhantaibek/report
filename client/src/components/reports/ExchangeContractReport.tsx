@@ -21,6 +21,8 @@ export interface ExchangeContractData {
   quantity: number;
   price: number;
   value: number;
+  /** НКД по сделке, сом (Trades.Accruedint). */
+  accruedInt?: number | null;
   settleDate?: string | null;
   couponRate?: number | null;
   sellerCommission?: number | null;
@@ -91,9 +93,11 @@ function OneContract({
   const tradeTime = data.tradeDateTime ? fmtTime(data.tradeDateTime) : (tradeDate ? fmtTime(tradeDate) : '—');
   const couponVal = data.couponRate != null
     ? `${fmtNum(data.couponRate, 2)} %`
-    : '—';
+    : '0';
   const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
   const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
+  const accruedInt = data.accruedInt ?? 0;
+  const totalValue = data.value + accruedInt;
 
   return (
     <div className="print-duplex-copy w-full bg-white text-sm leading-normal">
@@ -156,10 +160,16 @@ function OneContract({
           value2={sellerComm}
         />
         <Row2
-          label1="Сумма сделки"
-          value1={`${fmtNum(data.value, 2)} с.`}
+          label1="НКД (накопленный купонный доход)"
+          value1={`${fmtNum(accruedInt, 2)} с.`}
           label2="Комиссионный сбор с Покупателя"
           value2={buyerComm}
+        />
+        <Row2
+          label1="Сумма сделки (с учётом НКД)"
+          value1={`${fmtNum(totalValue, 2)} с.`}
+          label2=""
+          value2=""
         />
       </div>
 

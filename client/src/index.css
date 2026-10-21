@@ -71,6 +71,11 @@
   margin: 10mm 12mm 10mm 18mm;
 }
 
+/* Выгрузка в Excel / Word / PDF: элементы, скрытые при печати, не попадают и в файл. */
+.report-exporting .print\:hidden {
+  display: none !important;
+}
+
 @media print {
   html,
   body,
