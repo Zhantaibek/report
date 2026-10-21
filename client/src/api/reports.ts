@@ -97,14 +97,6 @@ export function runUsdReport(dateFrom: string, dateTo: string, ownId?: number): 
   return api.post('/reports/usd', { dateFrom, dateTo, ownId });
 }
 
-export function runUsdForm2Report(
-  dateFrom: string,
-  dateTo: string,
-  ownId?: number,
-): Promise<{ rows: Record<string, unknown>[] }> {
-  return api.post('/reports/usd-form2', { dateFrom, dateTo, ownId });
-}
-
 export interface GoldContractRow {
   serial: number;
   trade_date: string;

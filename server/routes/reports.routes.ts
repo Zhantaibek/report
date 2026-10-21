@@ -5,7 +5,7 @@ import { reportToXlsxBuffer } from '../reports/export/xlsx.js';
 import { reportToCsv } from '../reports/export/csv.js';
 import { getDataSources } from '../config/data-sources.js';
 import { getSecurities, getClasses, getFirms, runCustomSqlQuery } from '../data-sources/index.js';
-import { queryOracleUsd, queryOracleUsdForm2, queryOracleInstruments, queryOracleGold, queryOracleIndex } from '../data-sources/oracle.js';
+import { queryOracleUsd, queryOracleInstruments, queryOracleGold, queryOracleIndex } from '../data-sources/oracle.js';
 import { getCurrencyRateForDate } from '../db/repositories/currencyRates.js';
 import { baseTradesQuery } from '../reports/report-definitions.js';
 import { calculateCommissionForTrade } from '../reports/commission-engine.js';
@@ -146,47 +146,6 @@ router.post('/usd', async (req, res) => {
     res.json({ rows });
   } catch (err) {
     console.error('[/api/reports/usd]', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
-  }
-});
-
-/**
- * Форма 2 USD: сделки из Oracle (ARCTS.DEAL + TS.DEAL), поля как у QUIK Form 2.
- */
-router.post('/usd-form2', async (req, res) => {
-  try {
-    const { dateFrom, dateTo, ownId } = req.body ?? {};
-    if (!dateFrom || !dateTo) {
-      res.status(400).json({ error: 'dateFrom and dateTo required' });
-      return;
-    }
-    const ownIdNum =
-      ownId !== undefined && ownId !== null && ownId !== ''
-        ? Number(ownId)
-        : undefined;
-    const oracleRows = await queryOracleUsdForm2(
-      dateFrom,
-      dateTo,
-      ownIdNum !== undefined && Number.isFinite(ownIdNum) ? ownIdNum : undefined,
-    );
-    const rows = oracleRows.map((row) => {
-      const secCode = (row.sec_extcode && row.sec_extcode.trim()) || String(row.ownid || row.serial);
-      const name = (row.issuer_namerus && row.issuer_namerus.trim()) || '';
-      return {
-        id: row.serial,
-        tradeDate: row.trade_date,
-        classCode: 'USD',
-        className: 'USD',
-        secCode,
-        secFullName: name ? (row.sec_extcode ? `${row.sec_extcode} — ${name}` : name) : secCode,
-        quantity: row.quantity,
-        price: row.price,
-        value: row.value,
-      };
-    });
-    res.json({ rows });
-  } catch (err) {
-    console.error('[/api/reports/usd-form2]', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Oracle query failed' });
   }
 });
