@@ -77,6 +77,9 @@ function Gap() {
   return <div className="print-gap mt-3" />;
 }
 
+/** Класс ЦБ, для которого в контракте выводится НКД. */
+const NKD_CLASS_CODE = 'LIST_GBA';
+
 const LEGAL_TEXT =
   'Настоящий Биржевой контракт удостоверяет факт заключения сделки купли-продажи ценных бумаг в ходе биржевых торгов, организованных ЗАО "Кыргызская Фондовая Биржа", а также определяет взаимные обязательства между Продавцом и Покупателем по исполнению этой сделки купли-продажи и обязательства Участников торгов по оплате комиссионного сбора в пользу ЗАО "Кыргызская Фондовая Биржа".';
 
@@ -96,7 +99,9 @@ function OneContract({
     : '0';
   const sellerComm = data.sellerCommission != null ? `${fmtNum(data.sellerCommission, 2)} с.` : '0 с.';
   const buyerComm = data.buyerCommission != null ? `${fmtNum(data.buyerCommission, 2)} с.` : '0 с.';
-  const accruedInt = data.accruedInt ?? 0;
+  // НКД показываем только для класса LIST_GBA
+  const showAccruedInt = data.classCode === NKD_CLASS_CODE;
+  const accruedInt = showAccruedInt ? (data.accruedInt ?? 0) : 0;
   const totalValue = data.value + accruedInt;
 
   return (
@@ -159,18 +164,29 @@ function OneContract({
           label2="Комиссионный сбор с Продавца"
           value2={sellerComm}
         />
-        <Row2
-          label1="НКД (накопленный купонный доход)"
-          value1={`${fmtNum(accruedInt, 2)} с.`}
-          label2="Комиссионный сбор с Покупателя"
-          value2={buyerComm}
-        />
-        <Row2
-          label1="Сумма сделки (с учётом НКД)"
-          value1={`${fmtNum(totalValue, 2)} с.`}
-          label2=""
-          value2=""
-        />
+        {showAccruedInt ? (
+          <>
+            <Row2
+              label1="НКД (накопленный купонный доход)"
+              value1={`${fmtNum(accruedInt, 2)} с.`}
+              label2="Комиссионный сбор с Покупателя"
+              value2={buyerComm}
+            />
+            <Row2
+              label1="Сумма сделки (с учётом НКД)"
+              value1={`${fmtNum(totalValue, 2)} с.`}
+              label2=""
+              value2=""
+            />
+          </>
+        ) : (
+          <Row2
+            label1="Сумма сделки"
+            value1={`${fmtNum(totalValue, 2)} с.`}
+            label2="Комиссионный сбор с Покупателя"
+            value2={buyerComm}
+          />
+        )}
       </div>
 
       <div className="print-duplex-foot">

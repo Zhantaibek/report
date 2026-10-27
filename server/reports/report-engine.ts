@@ -36,6 +36,18 @@ const EXCHANGE_TRADER_CODES = new Set([
   'Exchange_Contract_Gold_Quik',
 ]);
 
+/** Формы, где дата понедельника означает сделки за предыдущие четверг–пятницу. */
+const MONDAY_THU_FRI_CODES = new Set(['Exchange_Contract']);
+
+/** Понедельник (YYYY-MM-DD) → { dateFrom: четверг, dateTo: пятница } предыдущей недели; иначе null. */
+function mondayToPrevThuFri(date: string | undefined): { dateFrom: string; dateTo: string } | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const d = new Date(`${date}T00:00:00Z`);
+  if (d.getUTCDay() !== 1) return null;
+  const shift = (days: number) => new Date(d.getTime() - days * 86400000).toISOString().slice(0, 10);
+  return { dateFrom: shift(4), dateTo: shift(3) };
+}
+
 async function attachTradersFromQuikUsers(rows: Trade[]): Promise<Trade[]> {
   if (rows.length === 0) return rows;
   const users = await getAllQuikUsers();
@@ -63,7 +75,8 @@ async function attachTradersFromQuikUsers(rows: Trade[]): Promise<Trade[]> {
 }
 
 export async function runReport(params: RunReportParams): Promise<ReportResult> {
-  const { reportFormId, dataSourceIds = [], filters } = params;
+  const { reportFormId, dataSourceIds = [] } = params;
+  let { filters } = params;
 
   // Получаем форму из БД (базовые данные: id, code, name, description, type)
   const dbForm = await getReportFormById(reportFormId);
@@ -88,6 +101,11 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     requiredFields: null,
     customSql: null,
   };
+
+  if (MONDAY_THU_FRI_CODES.has(definition.code)) {
+    const range = mondayToPrevThuFri(filters.dateFrom);
+    if (range) filters = { ...filters, ...range };
+  }
 
   const sources = getDataSources(true);
   const sourceIds = dataSourceIds.length > 0 ? dataSourceIds : sources.map((ds) => ds.id);
