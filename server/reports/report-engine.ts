@@ -39,6 +39,9 @@ const EXCHANGE_TRADER_CODES = new Set([
 /** Формы, где дата понедельника означает сделки за предыдущие четверг–пятницу. */
 const MONDAY_THU_FRI_CODES = new Set(['Exchange_Contract']);
 
+/** Формы с диапазоном дат: правило понедельника — только если «Дата с» = «Дата по». */
+const MONDAY_THU_FRI_SAME_DAY_CODES = new Set(['Blank_Form_1', 'Blank_Form_2', 'Blank_Form_3']);
+
 /** Понедельник (YYYY-MM-DD) → { dateFrom: четверг, dateTo: пятница } предыдущей недели; иначе null. */
 function mondayToPrevThuFri(date: string | undefined): { dateFrom: string; dateTo: string } | null {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
@@ -102,7 +105,10 @@ export async function runReport(params: RunReportParams): Promise<ReportResult> 
     customSql: null,
   };
 
-  if (MONDAY_THU_FRI_CODES.has(definition.code)) {
+  if (
+    MONDAY_THU_FRI_CODES.has(definition.code)
+    || (MONDAY_THU_FRI_SAME_DAY_CODES.has(definition.code) && filters.dateFrom === filters.dateTo)
+  ) {
     const range = mondayToPrevThuFri(filters.dateFrom);
     if (range) filters = { ...filters, ...range };
   }

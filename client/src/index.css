@@ -76,6 +76,62 @@
   display: none !important;
 }
 
+/* Выгрузка в PDF: контракт / свидетельство растягивается на лист (высоту задаёт report-export.ts) */
+.report-pdf .mt-6:has(.print-duplex-sheet),
+.report-pdf .mt-10:has(.print-duplex-sheet) {
+  margin: 0 !important;
+}
+
+.report-pdf .print-duplex-sheet {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Запас снизу: html2canvas рисует текст чуть ниже, без него обрезается последняя строка */
+  padding-bottom: 16px !important;
+}
+
+.report-pdf .print-duplex-copy {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.report-pdf .print-duplex-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+
+.report-pdf .print-duplex-sheet .print-gap {
+  flex: 1 1 0;
+  margin: 0 !important;
+  min-height: 0.75rem;
+}
+
+/* Крупнее шрифт: свободная высота листа позволяет */
+.report-pdf .print-duplex-sheet .text-sm {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+/* Строки «метка-значение-метка-значение»: меткам шире, чтобы крупный шрифт не переносился */
+.report-pdf .print-duplex-body .w-1\/4:nth-child(odd) {
+  width: 30%;
+}
+
+.report-pdf .print-duplex-body .w-1\/4:nth-child(even) {
+  width: 20%;
+}
+
+.report-pdf .print-duplex-sheet h1 {
+  font-size: 24px;
+}
+
 @media print {
   html,
   body,
